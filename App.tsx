@@ -57,7 +57,7 @@ type Screen =
   | {name: 'nono'; diff: Diff};
 
 type GameSave = {
-  game: 'sudoku' | 'nono';
+  game: 'sudoku' | 'nono' | 'mines';
   key: string; // checksum of the base puzzle — identifies which one this is
   ts: number; // saved-at epoch ms
   diff: Diff;
@@ -90,6 +90,14 @@ function nonoKey(size: number, solution: boolean[]): string {
   let h = 0x811c9dc5;
   h ^= size; h = Math.imul(h, 0x01000193);
   for (let i = 0; i < solution.length; i++) { h ^= solution[i] ? 1 : 0; h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16).slice(-4).padStart(4, '0');
+}
+
+// Stable marker for a minesweeper board (from its mine layout + size).
+function mineKey(mine: boolean[], R: number, C: number): string {
+  let h = 0x811c9dc5;
+  h ^= R; h = Math.imul(h, 0x01000193); h ^= C; h = Math.imul(h, 0x01000193);
+  for (let i = 0; i < mine.length; i++) { h ^= mine[i] ? 1 : 0; h = Math.imul(h, 0x01000193); }
   return (h >>> 0).toString(16).slice(-4).padStart(4, '0');
 }
 
@@ -219,7 +227,7 @@ function App(): React.JSX.Element {
     case 'c4':
       return <ConnectFour diff={screen.diff} onMenu={home} />;
     case 'mines':
-      return <Minesweeper diff={screen.diff} onMenu={home} />;
+      return <Minesweeper diff={screen.diff} onMenu={home} saves={saves.filter(x => x.game === 'mines')} onSave={addSave} onDelete={k => delSave('mines', k)} />;
     case 'nono':
       return <Nonogram diff={screen.diff} onMenu={home} saves={saves.filter(x => x.game === 'nono')} onSave={addSave} onDelete={k => delSave('nono', k)} />;
     default:
@@ -860,26 +868,50 @@ function ConnectFour({diff, onMenu}: {diff: Diff; onMenu: () => void}): React.JS
 
 /* --------------------------------------------------------- Minesweeper */
 
-function Minesweeper({diff, onMenu}: {diff: Diff; onMenu: () => void}): React.JSX.Element {
-  const preset = MINE.PRESETS[diff];
-  const R = preset.rows, C = preset.cols, MINES = preset.mines;
+function Minesweeper({diff, onMenu, saves, onSave, onDelete}: {
+  diff: Diff; onMenu: () => void; saves: GameSave[]; onSave: (s: GameSave) => void; onDelete: (key: string) => void;
+}): React.JSX.Element {
+  const [dims, setDims] = useState<{rows: number; cols: number; mines: number}>(() => MINE.PRESETS[diff]);
+  const R = dims.rows, C = dims.cols, MINES = dims.mines;
   const cell = Math.max(26, gridCell(C, 640));
-  const [seed, setSeed] = useState(0);
   const [board, setBoard] = useState<{mine: boolean[]; count: Int8Array} | null>(null);
-  const [revealed, setRevealed] = useState<boolean[]>(() => Array(R * C).fill(false));
-  const [flags, setFlags] = useState<boolean[]>(() => Array(R * C).fill(false));
+  const [revealed, setRevealed] = useState<boolean[]>(() => Array(MINE.PRESETS[diff].rows * MINE.PRESETS[diff].cols).fill(false));
+  const [flags, setFlags] = useState<boolean[]>(() => Array(MINE.PRESETS[diff].rows * MINE.PRESETS[diff].cols).fill(false));
   const [mode, setMode] = useState<'dig' | 'flag'>('dig');
   const [dead, setDead] = useState(false);
   const [won, setWon] = useState(false);
   const [end, setEnd] = useState<{msg: string; kind: 'win' | 'lose'} | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [rules, setRules] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
   const idx = useRef({win: 0, lose: 0});
 
-  useEffect(() => {
-    setBoard(null); setRevealed(Array(R * C).fill(false)); setFlags(Array(R * C).fill(false));
-    setDead(false); setWon(false); setEnd(null); setMode('dig');
-  }, [seed, R, C]);
-  const newGame = () => setSeed(x => x + 1);
+  const newGame = () => {
+    const p = MINE.PRESETS[diff];
+    setDims(p); setBoard(null);
+    setRevealed(Array(p.rows * p.cols).fill(false)); setFlags(Array(p.rows * p.cols).fill(false));
+    setDead(false); setWon(false); setEnd(null); setInfo(null); setMode('dig');
+  };
+  const saveNow = () => {
+    if (!board) { setInfo('Start digging first'); return; }
+    const key = mineKey(board.mine, R, C);
+    const existed = saves.some(x => x.key === key);
+    let opened = 0;
+    for (let i = 0; i < R * C; i++) if (revealed[i] && !board.mine[i]) opened++;
+    onSave({
+      game: 'mines', key, ts: Date.now(), diff,
+      label: `${DIFFICULTIES[diff].label} ${R}×${C} · ${opened} open`,
+      data: {rows: R, cols: C, mines: MINES, mine: board.mine, count: Array.from(board.count), revealed: revealed.slice(), flags: flags.slice(), dead, won},
+    });
+    setInfo(existed ? `Updated grid #${key}` : `Saved grid #${key}`);
+  };
+  const loadSave = (sv: GameSave) => {
+    const d = sv.data;
+    setDims({rows: d.rows, cols: d.cols, mines: d.mines});
+    setBoard({mine: d.mine, count: Int8Array.from(d.count)});
+    setRevealed(d.revealed.slice()); setFlags(d.flags.slice());
+    setDead(!!d.dead); setWon(!!d.won); setEnd(null); setInfo('Loaded a saved board'); setShowSaved(false); setMode('dig');
+  };
 
   const flood = (b: {mine: boolean[]; count: Int8Array}, rev: boolean[], start: number) => {
     const stack = [start];
@@ -896,6 +928,7 @@ function Minesweeper({diff, onMenu}: {diff: Diff; onMenu: () => void}): React.JS
 
   const tap = (i: number) => {
     if (dead || won) return;
+    if (info) setInfo(null);
     if (mode === 'flag') { if (revealed[i]) return; setFlags(f => { const nf = f.slice(); nf[i] = !nf[i]; return nf; }); return; }
     if (flags[i] || revealed[i]) return;
     let b = board;
@@ -925,12 +958,14 @@ function Minesweeper({diff, onMenu}: {diff: Diff; onMenu: () => void}): React.JS
         <View style={{flexDirection: 'row'}}>
           <Pressable style={s.iconBtn} onPress={() => setRules(true)}><Text style={s.iconText}>Rules</Text></Pressable>
           <Pressable style={s.iconBtn} onPress={newGame}><Text style={s.iconText}>New</Text></Pressable>
+          <Pressable style={s.iconBtn} onPress={saveNow}><Text style={s.iconText}>Save</Text></Pressable>
+          <Pressable style={s.iconBtn} onPress={() => setShowSaved(true)}><Text style={s.iconText}>Saved ({saves.length})</Text></Pressable>
           <Pressable style={s.iconBtn} onPress={() => PluginManager.closePluginView()}><Text style={s.iconText}>✕</Text></Pressable>
         </View>
       </View>
 
       <View style={s.msgZone}>
-        {end ? null : <Text style={s.hintText}>Mines: {MINES} · Flags: {flagCount}</Text>}
+        {end ? null : <Text style={s.hintText}>{info || `Mines: ${MINES} · Flags: ${flagCount}`}</Text>}
       </View>
 
       <View style={s.centerArea}>
@@ -964,6 +999,7 @@ function Minesweeper({diff, onMenu}: {diff: Diff; onMenu: () => void}): React.JS
         <Pressable style={[s.actionBtn, mode === 'dig' && s.solidBtn]} onPress={() => setMode('dig')}><Text style={[s.actionText, mode === 'dig' && s.solidText]}>Dig</Text></Pressable>
         <Pressable style={[s.actionBtn, mode === 'flag' && s.solidBtn]} onPress={() => setMode('flag')}><Text style={[s.actionText, mode === 'flag' && s.solidText]}>Flag ⚑</Text></Pressable>
       </View>
+      {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
       {rules ? <RulesModal game="mines" onClose={() => setRules(false)} /> : null}
     </View>
   );
@@ -1101,8 +1137,11 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete}: {
                   <Pressable key={c} onPress={() => tap(i)}
                     style={[
                       {width: cell, height: cell, alignItems: 'center', justifyContent: 'center', borderColor: INK,
-                        borderRightWidth: (c + 1) % 5 === 0 ? 2 : 1, borderBottomWidth: (r + 1) % 5 === 0 ? 2 : 1,
-                        borderLeftWidth: c === 0 ? 2 : 0, borderTopWidth: r === 0 ? 2 : 0},
+                        borderLeftWidth: c === 0 ? 2 : 0,
+                        borderTopWidth: r === 0 ? 2 : 0,
+                        // thick outer border always; every-5 guide lines only when the size is a multiple of 5
+                        borderRightWidth: c === size - 1 ? 2 : (size % 5 === 0 && (c + 1) % 5 === 0 ? 2 : 1),
+                        borderBottomWidth: r === size - 1 ? 2 : (size % 5 === 0 && (r + 1) % 5 === 0 ? 2 : 1)},
                       fill[i] && s.nonoFill,
                     ]}>
                     {!fill[i] && marks[i] ? <Text style={s.nonoMark}>✕</Text> : null}
