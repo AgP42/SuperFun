@@ -2,8 +2,8 @@
   "name": "superfun",
   "desc": "SuperFun — little games for your Supernote (Sudoku, Tic-Tac-Toe…)",
   "iconPath": "assets/icon.png",
-  "versionName": "0.5.2",
-  "versionCode": "23",
+  "versionName": "0.5.3",
+  "versionCode": "24",
   "pluginID": "79phr8eyeuokhe0m",
   "pluginKey": "superfun",
   "jsMainPath": "index"
