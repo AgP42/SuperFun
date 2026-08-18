@@ -29,9 +29,10 @@ there’s nothing to memorise.
 
 ## Highlights
 
-- **Generated on device** — Sudoku grids are guaranteed to have a *unique*
-  solution; Nonograms and Minesweeper boards are made fresh each time. No bundled
-  puzzle bank, effectively endless.
+- **Made on device** — Sudoku grids (guaranteed *unique* solution) and Minesweeper
+  boards are generated fresh each time, effectively endless. Nonograms are a set of
+  hand‑drawn pixel‑art pictures, each verified to be *uniquely* solvable from its
+  clues — so the picture you reveal is really the one you were meant to find.
 - **Real opponents** — the duel games use a proper game‑tree search (minimax /
   alpha‑beta). Easy plays loose, Hard plays sharp.
 - **Persistent saves** — Sudoku & Nonogram grids can be saved and resumed *after

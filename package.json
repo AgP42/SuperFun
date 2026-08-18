@@ -1,6 +1,6 @@
 {
   "name": "superfun",
-  "version": "0.4.7",
+  "version": "0.5.0",
   "description": "SuperFun — little games for your Supernote (Sudoku, Tic-Tac-Toe…)",
   "private": true,
   "scripts": {

@@ -1014,7 +1014,14 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete}: {
 
   const solved = NONO.validate(fill, puz.rowClues, puz.colClues, size);
   const won = end?.kind === 'win';
-  useEffect(() => { if (solved && !won && !shown) setEnd({msg: pick(NONO_WIN, idx.current.win++), kind: 'win'}); }, [solved, won, shown]);
+  useEffect(() => {
+    if (solved && !won && !shown) {
+      const n = (puz as any).name || 'picture';
+      const art = /^[aeiou]/i.test(n) ? 'an' : 'a';
+      idx.current.win++;
+      setEnd({msg: `It's ${art} ${n}! 🎉`, kind: 'win'});
+    }
+  }, [solved, won, shown, puz]);
 
   const hint = () => {
     if (solved) return;

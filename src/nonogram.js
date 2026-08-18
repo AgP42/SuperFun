@@ -1,14 +1,48 @@
 /**
- * SuperFun — Nonogram (Picross) generation + validation (v0.3)
+ * SuperFun — Nonogram (Picross) generation + validation (v0.5)
  *
- * A puzzle is a random filled picture; the player reconstructs any picture that
- * satisfies the row/column clues (the proper win condition — not necessarily
- * the exact generated one). CommonJS.
+ * The solved grid is a real, hand‑drawn pixel‑art picture (not random noise).
+ * A puzzle picks one picture of the right size, derives its row/column clues,
+ * and the player reconstructs it. Win = every clue satisfied. Each shipped
+ * picture is verified to be *uniquely* solvable (see verify_nonograms.js), so
+ * the only clue‑satisfying grid is the intended drawing.
+ *
+ * CommonJS — runs under Node (tests) and the RN/Hermes runtime.
  */
 'use strict';
 
-// Run-length clue for a boolean line, e.g. [true,true,false,true] -> [2,1].
-// An empty line is represented as [0].
+// '#' = filled, '.' = empty. Each entry: {name, rows:[...]}.
+// Every picture must be square (size×size). Only uniquely‑solvable ones ship —
+// the list below is the verified set.
+var PICTURES = {
+  5: [
+    {name: 'heart', rows: ['.#.#.', '#####', '#####', '.###.', '..#..']},
+    {name: 'cross', rows: ['..#..', '..#..', '#####', '..#..', '..#..']},
+    {name: 'diamond', rows: ['..#..', '.###.', '#####', '.###.', '..#..']},
+    {name: 'arrow', rows: ['..#..', '.###.', '#.#.#', '..#..', '..#..']},
+    {name: 'boat', rows: ['...#.', '...#.', '#..#.', '#####', '.###.']},
+  ],
+  8: [
+    {name: 'heart', rows: ['.##..##.', '########', '########', '########', '.######.', '..####..', '...##...', '........']},
+    {name: 'diamond', rows: ['...##...', '..####..', '.######.', '########', '########', '.######.', '..####..', '...##...']},
+    {name: 'smiley', rows: ['.######.', '##....##', '#.#..#.#', '#......#', '#......#', '#.####.#', '##....##', '.######.']},
+    {name: 'house', rows: ['...##...', '..####..', '.######.', '########', '#.####.#', '#.#..#.#', '#.#..#.#', '########']},
+    {name: 'mushroom', rows: ['..####..', '.######.', '########', '########', '...##...', '...##...', '..####..', '..####..']},
+    {name: 'star', rows: ['...##...', '...##...', '.######.', '########', '.######.', '..####..', '.##..##.', '##....##']},
+    {name: 'key', rows: ['.####...', '.#..#...', '.####...', '..##....', '..##....', '..###...', '..##....', '..###...']},
+  ],
+  10: [
+    {name: 'heart', rows: ['.##....##.', '####..####', '##########', '##########', '##########', '.########.', '..######..', '...####...', '....##....', '..........']},
+    {name: 'diamond', rows: ['....##....', '...####...', '..######..', '.########.', '##########', '##########', '.########.', '..######..', '...####...', '....##....']},
+    {name: 'star', rows: ['....##....', '....##....', '...####...', '.########.', '##########', '.########.', '..######..', '.##.##.##.', '##......##', '..........']},
+    {name: 'rocket', rows: ['....##....', '...####...', '...####...', '..######..', '..######..', '..######..', '.########.', '##.####.##', '#..#..#..#', '...#..#...']},
+    {name: 'fish', rows: ['..........', '...####...', '..######.#', '.#######.#', '.########.', '.#######.#', '..######.#', '...####...', '..........', '..........']},
+    {name: 'umbrella', rows: ['...####...', '..######..', '.########.', '##########', '#.######.#', '....##....', '....##....', '....##....', '...###....', '..###.....']},
+    {name: 'tree', rows: ['....##....', '...####...', '..######..', '.########.', '##########', '.########.', '..######..', '....##....', '....##....', '...####...']},
+    {name: 'cat', rows: ['##......##', '####..####', '##########', '#.#....#.#', '##########', '##########', '##.####.##', '#........#', '.########.', '..######..']},
+  ],
+};
+
 function lineClue(line) {
   var runs = [], run = 0;
   for (var i = 0; i < line.length; i++) {
@@ -25,18 +59,14 @@ function arraysEqual(a, b) {
   return true;
 }
 
-/**
- * Generate a size×size puzzle. Returns {size, solution:boolean[], rowClues, colClues}.
- * Density ~0.55; retries to avoid any fully-empty row or column (nicer puzzles).
- */
-function generate(size, rng) {
-  rng = rng || Math.random;
-  var n = size * size, sol;
-  for (var attempt = 0; attempt < 40; attempt++) {
-    sol = new Array(n);
-    for (var i = 0; i < n; i++) sol[i] = rng() < 0.55;
-    if (ok(sol, size)) break;
-  }
+// Convert a picture's rows to a flat boolean[size*size].
+function pictureToSolution(rows, size) {
+  var sol = new Array(size * size);
+  for (var r = 0; r < size; r++) for (var c = 0; c < size; c++) sol[r * size + c] = rows[r][c] === '#';
+  return sol;
+}
+
+function cluesFor(sol, size) {
   var rowClues = [], colClues = [], r, c;
   for (r = 0; r < size; r++) {
     var row = [];
@@ -48,14 +78,20 @@ function generate(size, rng) {
     for (r = 0; r < size; r++) col.push(sol[r * size + c]);
     colClues.push(lineClue(col));
   }
-  return {size: size, solution: sol, rowClues: rowClues, colClues: colClues};
+  return {rowClues: rowClues, colClues: colClues};
 }
 
-function ok(sol, size) {
-  var r, c, any;
-  for (r = 0; r < size; r++) { any = false; for (c = 0; c < size; c++) if (sol[r * size + c]) any = true; if (!any) return false; }
-  for (c = 0; c < size; c++) { any = false; for (r = 0; r < size; r++) if (sol[r * size + c]) any = true; if (!any) return false; }
-  return true;
+/**
+ * Generate a puzzle: pick a random picture of `size`, derive its clues.
+ * Returns {size, solution, rowClues, colClues, name}.
+ */
+function generate(size, rng) {
+  rng = rng || Math.random;
+  var bank = PICTURES[size] || PICTURES[8];
+  var pic = bank[Math.floor(rng() * bank.length)];
+  var sol = pictureToSolution(pic.rows, size);
+  var cl = cluesFor(sol, size);
+  return {size: size, solution: sol, rowClues: cl.rowClues, colClues: cl.colClues, name: pic.name};
 }
 
 /** True when `fill` (boolean[]) satisfies every row and column clue. */
@@ -76,4 +112,12 @@ function validate(fill, rowClues, colClues, size) {
 
 var SIZES = {easy: 5, medium: 8, hard: 10};
 
-module.exports = {lineClue: lineClue, generate: generate, validate: validate, SIZES: SIZES};
+module.exports = {
+  PICTURES: PICTURES,
+  lineClue: lineClue,
+  cluesFor: cluesFor,
+  pictureToSolution: pictureToSolution,
+  generate: generate,
+  validate: validate,
+  SIZES: SIZES,
+};
