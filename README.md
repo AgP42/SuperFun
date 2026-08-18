@@ -8,7 +8,7 @@ A plugin that turns your Supernote e‑ink tablet into a pocket arcade of calm,
 paper‑friendly games. Pure black &amp; white, finger‑first, no animation, no
 network — everything is generated and played right on the device.
 
-<img src="docs/screenshots/home.png" alt="SuperFun home — game launcher" width="380">
+<img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/home.png" alt="SuperFun home — game launcher" width="380">
 
 </div>
 
