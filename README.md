@@ -2,11 +2,11 @@
 
 # SuperFun
 
-**Little games for your Supernote — generated fresh, played on paper.**
+**A pocket arcade of calm, paper‑friendly games for your Supernote.**
 
-A plugin that turns your Supernote e‑ink tablet into a pocket arcade of calm,
-paper‑friendly games. Pure black &amp; white, finger‑first, no animation, no
-network — everything is generated and played right on the device.
+Turn your Supernote e‑ink tablet into a little games console — around **20 games**
+in one plugin. Pure black &amp; white, finger‑first, no account, no network:
+everything is generated and played right on the device.
 
 <img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/home.png" alt="SuperFun home — game launcher" width="380">
 
@@ -14,15 +14,64 @@ network — everything is generated and played right on the device.
 
 ---
 
+## Game gallery
+
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/gallery-1.png" alt="Two‑player duels" width="420"></td>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/gallery-2.png" alt="Solo puzzles" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Duels &amp; 2‑player</em></td>
+    <td align="center"><em>Solo puzzles</em></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/gallery-3.png" alt="More games" width="420"></td>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/gallery-4.png" alt="Even more games" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Dice, Snakes &amp; Ladders, picture puzzles…</em></td>
+    <td align="center"><em>…and more</em></td>
+  </tr>
+</table>
+
 ## Games
 
-| Game | Type | What it does |
-|------|------|--------------|
-| **Sudoku** | Solo puzzle | Unique‑solution grids generated on device. Two‑list input (Answer / Notes), handwritten entries, Check & Give‑a‑hint, and savable grids. |
-| **Nonogram** (Picross) | Solo puzzle | Reveal the picture from row/column clues. Fill / Mark modes, Check, Hint and Solution, and savable grids. |
-| **Minesweeper** | Solo puzzle | Classic sweep with a guaranteed‑safe first tap. Dig / Flag modes, three sizes. |
-| **Tic‑Tac‑Toe** | vs the Supernote | You’re O and move first; the Supernote plays X with a minimax AI. **Hard is unbeatable.** Running scoreboard. |
-| **Connect Four** | vs the Supernote | Drop four in a row against an alpha‑beta AI. Running scoreboard. |
+**🧩 Solo puzzles**
+
+| Game | What it does |
+|------|--------------|
+| **Sudoku** | Unique‑solution grids generated on device. Two‑list input (Answer / Notes), handwritten entries, Check &amp; Give‑a‑hint. |
+| **Nonogram** (Picross) | Reveal the picture from row/column clues. Fill / Mark modes, Check, Hint and Solution. |
+| **Minesweeper** | Classic sweep with a guaranteed‑safe first tap. Dig / Flag modes, three sizes. |
+| **Word Search** | Find hidden words — **68 themes** across **5 languages** (EN · DE · FR · ES · IT). Show/Hide the word list for a harder round. |
+| **2048** | Slide &amp; merge to the goal tile. Three grid sizes. |
+| **15‑Puzzle** | Slide tiles into order — numbers or **picture** mode, with a hint solver. |
+| **Mastermind** | Crack the hidden code. Per‑peg feedback (Easy) or classic aggregated pegs (Medium/Hard). |
+| **Peg Solitaire** | Jump and clear the board — Triangle, Cross and Big‑Cross shapes. |
+| **Memory** | Flip and match pairs (1–4 players). |
+| **Dice Roller** | A simple 1–6 dice roller for any tabletop game. |
+
+**🤖 vs SuperFun (the AI)** — three difficulty levels each
+
+| Game | What it does |
+|------|--------------|
+| **Chess** | Full rules (castling, en‑passant, promotion), alpha‑beta AI. |
+| **Ultimate Tic‑Tac‑Toe** | Nine boards in one, MCTS opponent. |
+| **Connect Four** | Drop four in a row against an alpha‑beta AI. |
+| **Reversi** | Outflank and flip discs. |
+| **Checkers** | Jump, chain and crown kings (8×8). |
+| **Dames** | International draughts with flying kings (10×10). |
+| **Dots &amp; Boxes** | Claim boxes; also 2–4 players. |
+| **Tic‑Tac‑Toe** | Minimax AI — **Hard is unbeatable.** |
+| **Battleship** | Place your fleet, then hunt the AI’s ships. |
+
+**👨‍👩‍👧‍👦 Multiplayer (2–4 players, hot‑seat)**
+
+Chess · Tic‑Tac‑Toe · Ultimate TTT · Connect Four · Reversi · Checkers · Dames ·
+Dots &amp; Boxes · **Pig** · **Snakes &amp; Ladders** — plus **Battleship** in
+“paper mode” (two Supernotes, or one player keeps a paper grid; you can also
+screenshot the grids and print them).
 
 Every game ships with an in‑app **“Rules”** card (with a small worked example), so
 there’s nothing to memorise.
@@ -30,34 +79,18 @@ there’s nothing to memorise.
 ## Highlights
 
 - **Made on device** — Sudoku grids (guaranteed *unique* solution) and Minesweeper
-  boards are generated fresh each time, effectively endless. Nonograms are a set of
-  hand‑drawn pixel‑art pictures, each verified to be *uniquely* solvable from its
-  clues — so the picture you reveal is really the one you were meant to find.
+  boards are generated fresh every time. Nonograms are hand‑drawn pixel‑art pictures,
+  each verified to be *uniquely* solvable from its clues.
 - **Real opponents** — the duel games use a proper game‑tree search (minimax /
-  alpha‑beta). Easy plays loose, Hard plays sharp.
-- **Persistent saves** — Sudoku & Nonogram grids can be saved and resumed *after
-  closing the plugin*, stored as JSON in `MyStyle/Plugins/SuperFun/`. Each save is
-  tagged with a grid fingerprint and a timestamp; re‑saving the same grid updates
-  its own entry.
-- **Three difficulty levels** for every game.
+  alpha‑beta / MCTS). Easy plays loose, Hard plays sharp.
+- **Auto‑resume + manual saves** — close mid‑game and it’s right there when you
+  reopen it; every game also keeps up to 10 manual saves, stored as JSON in
+  `MyStyle/Plugins/SuperFun/`.
+- **Family play** — pick 2–4 players, give each a **name and an emoji** (taken
+  emojis grey out), with a big “whose turn” indicator.
 - **Built for e‑ink** — high‑contrast B/W, large tap targets, no animation, and a
   layout where the board never jumps around while you play.
-- **Handwriting‑style entries** — your answers render in a handwritten face,
-  clearly distinct from the printed clues.
-
-## Screenshots
-
-| Home | Sudoku | Nonogram |
-|------|--------|----------|
-| ![Home](docs/screenshots/home.png) | ![Sudoku](docs/screenshots/sudoku.png) | ![Nonogram](docs/screenshots/nonogram.png) |
-
-| Minesweeper | Tic‑Tac‑Toe | Connect Four |
-|-------------|-------------|--------------|
-| ![Minesweeper](docs/screenshots/minesweeper.png) | ![Tic‑Tac‑Toe](docs/screenshots/tictactoe.png) | ![Connect Four](docs/screenshots/connectfour.png) |
-
-| Big end‑of‑game message | In‑app rules, with a worked example |
-|-------------------------|-------------------------------------|
-| ![Boom](docs/screenshots/boom.png) | ![Rules](docs/screenshots/rules.png) |
+- **Offline &amp; private** — no account, no network, nothing leaves your device.
 
 ## Install (on the device)
 
@@ -89,9 +122,10 @@ names the file `superfun-<version>.snplg`.)
 
 - **React Native 0.79.2** on the Supernote **PluginHost** runtime, via
   [`sn-plugin-lib`](https://www.npmjs.com/package/sn-plugin-lib).
-- Game engines are dependency‑free JavaScript modules in [`src/`](src) — `sudoku.js`,
-  `nonogram.js`, `minesweeper.js`, `tictactoe.js`, `connect4.js` — usable and testable
-  outside the app.
+- Game engines are dependency‑free JavaScript modules in [`src/`](src) — one per
+  game (`sudoku.js`, `nonogram.js`, `chess.js`, `uttt.js`, `reversi.js`,
+  `checkers.js`, `dames.js`, `wordsearch.js`, `mastermind.js`, …) — usable and
+  testable outside the app. The chess engine is perft‑validated.
 - A tiny native Kotlin module (`FileStore`) provides `writeText`/`readText` so saves
   can persist to disk (the SDK exposes no generic file‑write from JS).
 

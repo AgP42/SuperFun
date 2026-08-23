@@ -1,9 +1,9 @@
 {
-  "name": "superfun",
-  "desc": "SuperFun — little games for your Supernote (Sudoku, Tic-Tac-Toe…)",
+  "name": "SuperFun",
+  "desc": "SuperFun — a whole arcade of little e-ink games in one plugin: Sudoku, Nonogram, Minesweeper, Word Search, 2048, 15-Puzzle, Mastermind, Peg Solitaire, Memory, Tic-Tac-Toe, Ultimate TTT, Connect Four, Reversi, Checkers, Dames, Dots & Boxes, Pig, Snakes & Ladders and Battleship. Play solo, against the Supernote, or with 2–4 players — with saved games and a records board.",
   "iconPath": "assets/icon.png",
-  "versionName": "0.5.3",
-  "versionCode": "24",
+  "versionName": "0.28.7",
+  "versionCode": "78",
   "pluginID": "79phr8eyeuokhe0m",
   "pluginKey": "superfun",
   "jsMainPath": "index"

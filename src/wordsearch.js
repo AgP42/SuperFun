@@ -1,0 +1,571 @@
+/**
+ * SuperFun — Word Search engine + themed multilingual word banks (v0.8)
+ *
+ * Three age tiers (Easy/Medium/Hard), five languages (EN/DE/FR/ES/IT).
+ * Each tier owns MANY themed lists; a round picks one theme at random
+ * (like the Nonogram picture bank) and lays its words into a letter grid.
+ *
+ * Letters are normalised to A–Z (accents stripped, ß→SS, ä→AE …) so the grid
+ * stays a clean square of capitals — findable on e-ink, language-agnostic to
+ * render. Word banks are written pre-folded (ASCII caps) so length == display.
+ *
+ * CommonJS — Node (dev checks) and RN/Hermes.
+ */
+'use strict';
+
+// 8 compass directions as [dr, dc].
+var DIRS = {
+  E: [0, 1], W: [0, -1], S: [1, 0], N: [-1, 0],
+  SE: [1, 1], NW: [-1, -1], NE: [-1, 1], SW: [1, -1],
+};
+
+// Per-tier config: grid size, how many words to place, which directions.
+var TIERS = {
+  easy:   {label: 'Kids',   size: 8,  count: 6,  dirs: ['E', 'S', 'SE']},
+  medium: {label: 'Teens',  size: 11, count: 8,  dirs: ['E', 'S', 'SE', 'NE', 'W', 'N']},
+  hard:   {label: 'Adults', size: 14, count: 10, dirs: ['E', 'W', 'N', 'S', 'NE', 'NW', 'SE', 'SW']},
+};
+
+// Helper to keep the big bank readable: T(names, en, de, fr, es, it).
+function T(names, en, de, fr, es, it) {
+  return {name: {en: names[0], de: names[1], fr: names[2], es: names[3], it: names[4]},
+          words: {en: en, de: de, fr: fr, es: es, it: it}};
+}
+
+// --- Themed word banks. Words picked per selected language, filtered to fit. --
+var THEMES = {
+  easy: [
+    T(['Animals', 'Tiere', 'Animaux', 'Animales', 'Animali'],
+      ['CAT', 'DOG', 'LION', 'BEAR', 'FROG', 'DUCK', 'GOAT', 'FISH', 'OWL', 'WOLF'],
+      ['KATZE', 'HUND', 'LOEWE', 'BAER', 'FROSCH', 'ENTE', 'ZIEGE', 'FISCH', 'EULE', 'WOLF'],
+      ['CHAT', 'CHIEN', 'LION', 'OURS', 'CANARD', 'CHEVRE', 'POISSON', 'LOUP', 'HIBOU', 'RENARD'],
+      ['GATO', 'PERRO', 'LEON', 'OSO', 'RANA', 'PATO', 'CABRA', 'PEZ', 'BUHO', 'LOBO'],
+      ['GATTO', 'CANE', 'LEONE', 'ORSO', 'RANA', 'ANATRA', 'CAPRA', 'PESCE', 'GUFO', 'LUPO']),
+    T(['Colors', 'Farben', 'Couleurs', 'Colores', 'Colori'],
+      ['RED', 'BLUE', 'GREEN', 'PINK', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GOLD', 'PURPLE'],
+      ['ROT', 'BLAU', 'GRUEN', 'ROSA', 'SCHWARZ', 'WEISS', 'BRAUN', 'GRAU', 'GOLD', 'LILA'],
+      ['ROUGE', 'BLEU', 'VERT', 'ROSE', 'NOIR', 'BLANC', 'BRUN', 'GRIS', 'JAUNE', 'VIOLET'],
+      ['ROJO', 'AZUL', 'VERDE', 'ROSA', 'NEGRO', 'BLANCO', 'MARRON', 'GRIS', 'ORO', 'MORADO'],
+      ['ROSSO', 'BLU', 'VERDE', 'ROSA', 'NERO', 'BIANCO', 'MARRONE', 'GRIGIO', 'ORO', 'VIOLA']),
+    T(['Ocean', 'Meer', 'Ocean', 'Oceano', 'Oceano'],
+      ['FISH', 'CRAB', 'SHARK', 'WHALE', 'CORAL', 'WAVE', 'SHELL', 'SEAL', 'SQUID', 'BOAT'],
+      ['FISCH', 'KRABBE', 'HAI', 'WAL', 'KORALLE', 'WELLE', 'MUSCHEL', 'ROBBE', 'KRAKE', 'BOOT'],
+      ['POISSON', 'CRABE', 'REQUIN', 'BALEINE', 'CORAIL', 'VAGUE', 'ALGUE', 'PHOQUE', 'PIEUVRE', 'BATEAU'],
+      ['PEZ', 'CANGREJO', 'TIBURON', 'BALLENA', 'CORAL', 'OLA', 'CONCHA', 'FOCA', 'CALAMAR', 'BARCO'],
+      ['PESCE', 'GRANCHIO', 'SQUALO', 'BALENA', 'CORALLO', 'ONDA', 'GUSCIO', 'FOCA', 'CALAMARO', 'BARCA']),
+    T(['Fruits', 'Obst', 'Fruits', 'Frutas', 'Frutta'],
+      ['APPLE', 'PEAR', 'BANANA', 'GRAPE', 'LEMON', 'PLUM', 'CHERRY', 'PEACH', 'KIWI', 'MELON'],
+      ['APFEL', 'BIRNE', 'BANANE', 'TRAUBE', 'ZITRONE', 'PFLAUME', 'KIRSCHE', 'PFIRSICH', 'KIWI', 'MELONE'],
+      ['POMME', 'POIRE', 'BANANE', 'RAISIN', 'CITRON', 'PRUNE', 'CERISE', 'PECHE', 'KIWI', 'MELON'],
+      ['MANZANA', 'PERA', 'PLATANO', 'UVA', 'LIMON', 'CIRUELA', 'CEREZA', 'MELON', 'KIWI', 'FRESA'],
+      ['MELA', 'PERA', 'BANANA', 'UVA', 'LIMONE', 'PRUGNA', 'CILIEGIA', 'PESCA', 'KIWI', 'MELONE']),
+    T(['Vegetables', 'Gemuese', 'Legumes', 'Verduras', 'Verdure'],
+      ['CARROT', 'ONION', 'POTATO', 'TOMATO', 'PEA', 'BEAN', 'CORN', 'PEPPER', 'GARLIC', 'SALAD'],
+      ['KAROTTE', 'ZWIEBEL', 'TOMATE', 'ERBSE', 'BOHNE', 'MAIS', 'PAPRIKA', 'SPINAT', 'SALAT', 'PILZ'],
+      ['CAROTTE', 'OIGNON', 'PATATE', 'TOMATE', 'POIS', 'HARICOT', 'MAIS', 'POIVRON', 'AIL', 'EPINARD'],
+      ['CEBOLLA', 'PATATA', 'TOMATE', 'GUISANTE', 'JUDIA', 'MAIZ', 'PIMIENTO', 'AJO', 'ESPINACA', 'SETA'],
+      ['CAROTA', 'CIPOLLA', 'PATATA', 'POMODORO', 'PISELLO', 'FAGIOLO', 'MAIS', 'PEPERONE', 'AGLIO', 'FUNGO']),
+    T(['Farm', 'Bauernhof', 'Ferme', 'Granja', 'Fattoria'],
+      ['COW', 'PIG', 'HEN', 'HORSE', 'SHEEP', 'GOAT', 'DUCK', 'BARN', 'TRACTOR', 'FIELD'],
+      ['KUH', 'SCHWEIN', 'HENNE', 'PFERD', 'SCHAF', 'ZIEGE', 'ENTE', 'SCHEUNE', 'TRAKTOR', 'FELD'],
+      ['VACHE', 'COCHON', 'POULE', 'CHEVAL', 'MOUTON', 'CHEVRE', 'CANARD', 'GRANGE', 'TRACTEUR', 'CHAMP'],
+      ['VACA', 'CERDO', 'GALLINA', 'CABALLO', 'OVEJA', 'CABRA', 'PATO', 'GRANERO', 'TRACTOR', 'CAMPO'],
+      ['MUCCA', 'MAIALE', 'GALLINA', 'CAVALLO', 'PECORA', 'CAPRA', 'ANATRA', 'FIENILE', 'TRATTORE', 'CAMPO']),
+    T(['Body', 'Koerper', 'Corps', 'Cuerpo', 'Corpo'],
+      ['HEAD', 'HAND', 'FOOT', 'ARM', 'LEG', 'NOSE', 'EAR', 'EYE', 'MOUTH', 'HAIR'],
+      ['KOPF', 'HAND', 'FUSS', 'ARM', 'BEIN', 'NASE', 'OHR', 'AUGE', 'MUND', 'HAAR'],
+      ['TETE', 'MAIN', 'PIED', 'BRAS', 'JAMBE', 'NEZ', 'OREILLE', 'OEIL', 'BOUCHE', 'CHEVEUX'],
+      ['CABEZA', 'MANO', 'PIE', 'BRAZO', 'PIERNA', 'NARIZ', 'OREJA', 'OJO', 'BOCA', 'PELO'],
+      ['TESTA', 'MANO', 'PIEDE', 'BRACCIO', 'GAMBA', 'NASO', 'ORECCHIO', 'OCCHIO', 'BOCCA', 'CAPELLI']),
+    T(['Family', 'Familie', 'Famille', 'Familia', 'Famiglia'],
+      ['MOM', 'DAD', 'SON', 'AUNT', 'UNCLE', 'SISTER', 'COUSIN', 'BABY', 'GRANDMA', 'FAMILY'],
+      ['MAMA', 'PAPA', 'SOHN', 'TANTE', 'ONKEL', 'BRUDER', 'COUSIN', 'BABY', 'OMA', 'OPA'],
+      ['MAMAN', 'PAPA', 'FILS', 'FILLE', 'TANTE', 'ONCLE', 'SOEUR', 'FRERE', 'COUSIN', 'BEBE'],
+      ['MAMA', 'PAPA', 'HIJO', 'HIJA', 'TIA', 'TIO', 'HERMANA', 'PRIMO', 'BEBE', 'ABUELA'],
+      ['MAMMA', 'PAPA', 'FIGLIO', 'FIGLIA', 'ZIA', 'ZIO', 'SORELLA', 'CUGINO', 'NONNA', 'NONNO']),
+    T(['Food', 'Essen', 'Nourriture', 'Comida', 'Cibo'],
+      ['BREAD', 'CHEESE', 'EGG', 'RICE', 'SOUP', 'CAKE', 'MEAT', 'MILK', 'PASTA', 'PIZZA'],
+      ['BROT', 'KAESE', 'EI', 'REIS', 'SUPPE', 'KUCHEN', 'FLEISCH', 'MILCH', 'NUDELN', 'PIZZA'],
+      ['PAIN', 'FROMAGE', 'OEUF', 'RIZ', 'SOUPE', 'GATEAU', 'VIANDE', 'LAIT', 'PATES', 'PIZZA'],
+      ['PAN', 'QUESO', 'HUEVO', 'ARROZ', 'SOPA', 'PASTEL', 'CARNE', 'LECHE', 'PASTA', 'PIZZA'],
+      ['PANE', 'FORMAGGIO', 'UOVO', 'RISO', 'ZUPPA', 'TORTA', 'CARNE', 'LATTE', 'PASTA', 'PIZZA']),
+    T(['Toys', 'Spielzeug', 'Jouets', 'Juguetes', 'Giocattoli'],
+      ['BALL', 'DOLL', 'KITE', 'BLOCKS', 'CAR', 'DRUM', 'PUZZLE', 'ROBOT', 'TRAIN', 'YOYO'],
+      ['BALL', 'PUPPE', 'DRACHEN', 'AUTO', 'TROMMEL', 'PUZZLE', 'ROBOTER', 'ZUG', 'REIFEN', 'WUERFEL'],
+      ['BALLON', 'POUPEE', 'CERF', 'CUBES', 'VOITURE', 'TAMBOUR', 'PUZZLE', 'ROBOT', 'TRAIN', 'TOUPIE'],
+      ['PELOTA', 'MUNECA', 'COMETA', 'CUBOS', 'COCHE', 'TAMBOR', 'PUZLE', 'ROBOT', 'TREN', 'PEONZA'],
+      ['PALLA', 'BAMBOLA', 'AQUILONE', 'CUBI', 'AUTO', 'TAMBURO', 'PUZZLE', 'ROBOT', 'TRENO', 'TROTTOLA']),
+    T(['Clothes', 'Kleidung', 'Vetements', 'Ropa', 'Vestiti'],
+      ['HAT', 'SHIRT', 'SHOE', 'SOCK', 'COAT', 'DRESS', 'SKIRT', 'GLOVE', 'SCARF', 'JEANS'],
+      ['HUT', 'HEMD', 'SCHUH', 'SOCKE', 'MANTEL', 'KLEID', 'ROCK', 'HANDSCHUH', 'SCHAL', 'JEANS'],
+      ['CHAPEAU', 'CHEMISE', 'CHAUSSURE', 'CHAUSSETTE', 'MANTEAU', 'ROBE', 'JUPE', 'GANT', 'ECHARPE', 'JEAN'],
+      ['GORRO', 'CAMISA', 'ZAPATO', 'CALCETIN', 'ABRIGO', 'VESTIDO', 'FALDA', 'GUANTE', 'BUFANDA', 'VAQUEROS'],
+      ['CAPPELLO', 'CAMICIA', 'SCARPA', 'CALZINO', 'CAPPOTTO', 'VESTITO', 'GONNA', 'GUANTO', 'SCIARPA', 'JEANS']),
+    T(['Weather', 'Wetter', 'Meteo', 'Clima', 'Meteo'],
+      ['SUN', 'RAIN', 'SNOW', 'WIND', 'CLOUD', 'STORM', 'FOG', 'ICE', 'FROST', 'SKY'],
+      ['SONNE', 'REGEN', 'SCHNEE', 'WIND', 'WOLKE', 'STURM', 'NEBEL', 'EIS', 'FROST', 'HIMMEL'],
+      ['SOLEIL', 'PLUIE', 'NEIGE', 'VENT', 'NUAGE', 'ORAGE', 'BROUILLARD', 'GLACE', 'GIVRE', 'CIEL'],
+      ['SOL', 'LLUVIA', 'NIEVE', 'VIENTO', 'NUBE', 'TORMENTA', 'NIEBLA', 'HIELO', 'ESCARCHA', 'CIELO'],
+      ['SOLE', 'PIOGGIA', 'NEVE', 'VENTO', 'NUVOLA', 'TEMPESTA', 'NEBBIA', 'GHIACCIO', 'GELO', 'CIELO']),
+    T(['Vehicles', 'Fahrzeuge', 'Vehicules', 'Vehiculos', 'Veicoli'],
+      ['CAR', 'BUS', 'TRAIN', 'BIKE', 'BOAT', 'PLANE', 'TRUCK', 'VAN', 'SHIP', 'TAXI'],
+      ['AUTO', 'BUS', 'ZUG', 'RAD', 'BOOT', 'FLUGZEUG', 'LKW', 'SCHIFF', 'TAXI', 'ROLLER'],
+      ['VOITURE', 'BUS', 'TRAIN', 'VELO', 'BATEAU', 'AVION', 'CAMION', 'TAXI', 'MOTO', 'METRO'],
+      ['COCHE', 'BUS', 'TREN', 'BICI', 'BARCO', 'AVION', 'CAMION', 'TAXI', 'MOTO', 'METRO'],
+      ['AUTO', 'BUS', 'TRENO', 'BICI', 'BARCA', 'AEREO', 'CAMION', 'TAXI', 'MOTO', 'NAVE']),
+    T(['Bugs', 'Insekten', 'Insectes', 'Insectos', 'Insetti'],
+      ['ANT', 'BEE', 'FLY', 'WASP', 'MOTH', 'BEETLE', 'SPIDER', 'SNAIL', 'WORM', 'TICK'],
+      ['AMEISE', 'BIENE', 'FLIEGE', 'WESPE', 'MOTTE', 'KAEFER', 'SPINNE', 'SCHNECKE', 'WURM', 'LARVE'],
+      ['FOURMI', 'ABEILLE', 'MOUCHE', 'GUEPE', 'PAPILLON', 'SCARABEE', 'ARAIGNEE', 'ESCARGOT', 'VER', 'CRIQUET'],
+      ['HORMIGA', 'ABEJA', 'MOSCA', 'AVISPA', 'POLILLA', 'ESCARABAJO', 'ARANA', 'CARACOL', 'GUSANO', 'GRILLO'],
+      ['FORMICA', 'APE', 'MOSCA', 'VESPA', 'FALENA', 'SCARABEO', 'RAGNO', 'LUMACA', 'VERME', 'GRILLO']),
+    T(['Birds', 'Voegel', 'Oiseaux', 'Aves', 'Uccelli'],
+      ['OWL', 'HEN', 'DUCK', 'CROW', 'DOVE', 'EAGLE', 'ROBIN', 'SWAN', 'STORK', 'GOOSE'],
+      ['EULE', 'HENNE', 'ENTE', 'KRAEHE', 'TAUBE', 'ADLER', 'AMSEL', 'SCHWAN', 'STORCH', 'GANS'],
+      ['HIBOU', 'POULE', 'CANARD', 'CORBEAU', 'PIGEON', 'AIGLE', 'MERLE', 'CYGNE', 'CIGOGNE', 'OIE'],
+      ['BUHO', 'GALLINA', 'PATO', 'CUERVO', 'PALOMA', 'AGUILA', 'MIRLO', 'CISNE', 'CIGUENA', 'GANSO'],
+      ['GUFO', 'GALLINA', 'ANATRA', 'CORVO', 'COLOMBA', 'AQUILA', 'MERLO', 'CIGNO', 'CICOGNA', 'OCA']),
+    T(['Sweets', 'Suessigkeiten', 'Sucreries', 'Dulces', 'Dolci'],
+      ['CANDY', 'CAKE', 'DONUT', 'COOKIE', 'HONEY', 'JELLY', 'FUDGE', 'WAFFLE', 'MUFFIN', 'SYRUP'],
+      ['BONBON', 'KUCHEN', 'DONUT', 'KEKS', 'HONIG', 'GELEE', 'WAFFEL', 'MUFFIN', 'SIRUP', 'PRALINE'],
+      ['BONBON', 'GATEAU', 'DONUT', 'BISCUIT', 'MIEL', 'GELEE', 'GAUFRE', 'MUFFIN', 'SIROP', 'NOUGAT'],
+      ['CARAMELO', 'PASTEL', 'DONUT', 'GALLETA', 'MIEL', 'GELATINA', 'GOFRE', 'MAGDALENA', 'JARABE', 'TURRON'],
+      ['CARAMELLA', 'TORTA', 'CIAMBELLA', 'BISCOTTO', 'MIELE', 'GELATINA', 'CIALDA', 'MUFFIN', 'SCIROPPO', 'TORRONE']),
+    T(['Flowers', 'Blumen', 'Fleurs', 'Flores', 'Fiori'],
+      ['ROSE', 'TULIP', 'DAISY', 'LILY', 'POPPY', 'IRIS', 'PANSY', 'ORCHID', 'PETAL', 'STEM'],
+      ['ROSE', 'TULPE', 'GAENSE', 'LILIE', 'MOHN', 'IRIS', 'VEILCHEN', 'ORCHIDEE', 'BLUETE', 'STIEL'],
+      ['ROSE', 'TULIPE', 'MARGUERITE', 'LYS', 'PAVOT', 'IRIS', 'PENSEE', 'ORCHIDEE', 'PETALE', 'TIGE'],
+      ['ROSA', 'TULIPAN', 'MARGARITA', 'LIRIO', 'AMAPOLA', 'IRIS', 'PENSAMIENTO', 'ORQUIDEA', 'PETALO', 'TALLO'],
+      ['ROSA', 'TULIPANO', 'MARGHERITA', 'GIGLIO', 'PAPAVERO', 'IRIS', 'VIOLA', 'ORCHIDEA', 'PETALO', 'STELO']),
+    T(['School', 'Schule', 'Ecole', 'Escuela', 'Scuola'],
+      ['BOOK', 'PEN', 'DESK', 'RULER', 'CHALK', 'PAPER', 'GLUE', 'BAG', 'CLASS', 'TEST'],
+      ['BUCH', 'STIFT', 'PULT', 'LINEAL', 'KREIDE', 'PAPIER', 'KLEBER', 'TASCHE', 'KLASSE', 'TEST'],
+      ['LIVRE', 'STYLO', 'BUREAU', 'REGLE', 'CRAIE', 'PAPIER', 'COLLE', 'SAC', 'CLASSE', 'CAHIER'],
+      ['LIBRO', 'BOLI', 'MESA', 'REGLA', 'TIZA', 'PAPEL', 'PEGAMENTO', 'MOCHILA', 'CLASE', 'EXAMEN'],
+      ['LIBRO', 'PENNA', 'BANCO', 'RIGHELLO', 'GESSO', 'CARTA', 'COLLA', 'ZAINO', 'CLASSE', 'ESAME']),
+    T(['House', 'Haus', 'Maison', 'Casa', 'Casa'],
+      ['DOOR', 'ROOF', 'WALL', 'BED', 'CHAIR', 'TABLE', 'LAMP', 'SOFA', 'STAIRS', 'WINDOW'],
+      ['TUER', 'DACH', 'WAND', 'BETT', 'STUHL', 'TISCH', 'LAMPE', 'SOFA', 'TREPPE', 'FENSTER'],
+      ['PORTE', 'TOIT', 'MUR', 'LIT', 'CHAISE', 'TABLE', 'LAMPE', 'CANAPE', 'ESCALIER', 'FENETRE'],
+      ['PUERTA', 'TEJADO', 'PARED', 'CAMA', 'SILLA', 'MESA', 'LAMPARA', 'SOFA', 'ESCALERA', 'VENTANA'],
+      ['PORTA', 'TETTO', 'MURO', 'LETTO', 'SEDIA', 'TAVOLO', 'LAMPADA', 'DIVANO', 'SCALA', 'FINESTRA']),
+    T(['Sports', 'Sport', 'Sports', 'Deportes', 'Sport'],
+      ['SOCCER', 'TENNIS', 'GOLF', 'BOXING', 'RUGBY', 'SKI', 'JUDO', 'SURF', 'CHESS', 'DARTS'],
+      ['FUSSBALL', 'TENNIS', 'GOLF', 'BOXEN', 'RUGBY', 'SKI', 'JUDO', 'SURFEN', 'SCHACH', 'DART'],
+      ['FOOT', 'TENNIS', 'GOLF', 'BOXE', 'RUGBY', 'SKI', 'JUDO', 'SURF', 'ECHECS', 'FLECHETTE'],
+      ['FUTBOL', 'TENIS', 'GOLF', 'BOXEO', 'RUGBY', 'ESQUI', 'JUDO', 'SURF', 'AJEDREZ', 'DARDOS'],
+      ['CALCIO', 'TENNIS', 'GOLF', 'BOXE', 'RUGBY', 'SCI', 'JUDO', 'SURF', 'SCACCHI', 'FRECCETTE']),
+    T(['Jobs', 'Berufe', 'Metiers', 'Trabajos', 'Mestieri'],
+      ['DOCTOR', 'BAKER', 'PILOT', 'FARMER', 'CHEF', 'NURSE', 'ARTIST', 'JUDGE', 'CLOWN', 'ACTOR'],
+      ['ARZT', 'BAECKER', 'PILOT', 'BAUER', 'KOCH', 'ARTIST', 'MALER', 'RICHTER', 'CLOWN', 'LEHRER'],
+      ['MEDECIN', 'BOULANGER', 'PILOTE', 'FERMIER', 'CHEF', 'ARTISTE', 'PEINTRE', 'JUGE', 'CLOWN', 'ACTEUR'],
+      ['MEDICO', 'PANADERO', 'PILOTO', 'GRANJERO', 'COCINERO', 'ARTISTA', 'PINTOR', 'JUEZ', 'PAYASO', 'ACTOR'],
+      ['MEDICO', 'FORNAIO', 'PILOTA', 'CONTADINO', 'CUOCO', 'ARTISTA', 'PITTORE', 'GIUDICE', 'PAGLIACCIO', 'ATTORE']),
+    T(['Music', 'Musik', 'Musique', 'Musica', 'Musica'],
+      ['DRUM', 'PIANO', 'FLUTE', 'HARP', 'VIOLIN', 'GUITAR', 'SONG', 'BAND', 'NOTE', 'HORN'],
+      ['TROMMEL', 'KLAVIER', 'FLOETE', 'HARFE', 'GEIGE', 'GITARRE', 'LIED', 'BAND', 'NOTE', 'TROMPETE'],
+      ['TAMBOUR', 'PIANO', 'FLUTE', 'HARPE', 'VIOLON', 'GUITARE', 'CHANSON', 'GROUPE', 'NOTE', 'COR'],
+      ['TAMBOR', 'PIANO', 'FLAUTA', 'ARPA', 'VIOLIN', 'GUITARRA', 'CANCION', 'BANDA', 'NOTA', 'TROMPA'],
+      ['TAMBURO', 'PIANO', 'FLAUTO', 'ARPA', 'VIOLINO', 'CHITARRA', 'CANZONE', 'BANDA', 'NOTA', 'CORNO']),
+  ],
+  medium: [
+    T(['Superpowers', 'Superkraefte', 'Superpouvoirs', 'Superpoderes', 'Superpoteri'],
+      ['HERO', 'POWER', 'CAPE', 'MASK', 'SHIELD', 'LASER', 'FLIGHT', 'STRENGTH', 'SPEED', 'GADGET', 'VILLAIN'],
+      ['HELD', 'KRAFT', 'UMHANG', 'MASKE', 'SCHILD', 'LASER', 'FLUG', 'STAERKE', 'TEMPO', 'GERAET', 'SCHURKE'],
+      ['HEROS', 'POUVOIR', 'CAPE', 'MASQUE', 'BOUCLIER', 'LASER', 'VOL', 'FORCE', 'VITESSE', 'GADGET', 'MECHANT'],
+      ['HEROE', 'PODER', 'CAPA', 'MASCARA', 'ESCUDO', 'LASER', 'VUELO', 'FUERZA', 'VELOCIDAD', 'ARTILUGIO', 'VILLANO'],
+      ['EROE', 'POTERE', 'MANTELLO', 'MASCHERA', 'SCUDO', 'LASER', 'VOLO', 'FORZA', 'VELOCITA', 'GADGET', 'CATTIVO']),
+    T(['Gaming', 'Gaming', 'Jeux Video', 'Videojuegos', 'Videogiochi'],
+      ['LEVEL', 'QUEST', 'AVATAR', 'RESPAWN', 'LOOT', 'BOSS', 'PIXEL', 'COMBO', 'ARCADE', 'PLAYER', 'SCORE'],
+      ['LEVEL', 'QUEST', 'AVATAR', 'RESPAWN', 'BEUTE', 'BOSS', 'PIXEL', 'COMBO', 'ARKADE', 'SPIELER', 'PUNKTE'],
+      ['NIVEAU', 'QUETE', 'AVATAR', 'RENAITRE', 'BUTIN', 'BOSS', 'PIXEL', 'COMBO', 'ARCADE', 'JOUEUR', 'MANETTE'],
+      ['NIVEL', 'MISION', 'AVATAR', 'REAPARECER', 'BOTIN', 'JEFE', 'PIXEL', 'COMBO', 'ARCADE', 'JUGADOR', 'PUNTOS'],
+      ['LIVELLO', 'MISSIONE', 'AVATAR', 'RIGENERA', 'BOTTINO', 'BOSS', 'PIXEL', 'COMBO', 'ARCADE', 'GIOCATORE', 'PUNTEGGIO']),
+    T(['Space', 'Weltraum', 'Espace', 'Espacio', 'Spazio'],
+      ['PLANET', 'COMET', 'GALAXY', 'ROCKET', 'ORBIT', 'STAR', 'MOON', 'NEBULA', 'METEOR', 'COSMOS', 'GRAVITY'],
+      ['PLANET', 'KOMET', 'GALAXIE', 'RAKETE', 'ORBIT', 'STERN', 'MOND', 'NEBEL', 'METEOR', 'KOSMOS', 'ASTEROID'],
+      ['PLANETE', 'COMETE', 'GALAXIE', 'FUSEE', 'ORBITE', 'ETOILE', 'LUNE', 'METEORE', 'COSMOS', 'GRAVITE', 'NEBULEUSE'],
+      ['PLANETA', 'COMETA', 'GALAXIA', 'COHETE', 'ORBITA', 'ESTRELLA', 'LUNA', 'NEBULOSA', 'METEORO', 'COSMOS', 'GRAVEDAD'],
+      ['PIANETA', 'COMETA', 'GALASSIA', 'RAZZO', 'ORBITA', 'STELLA', 'LUNA', 'NEBULOSA', 'METEORA', 'COSMO', 'GRAVITA']),
+    T(['Sports', 'Sportarten', 'Sports', 'Deportes', 'Sport'],
+      ['FOOTBALL', 'TENNIS', 'HOCKEY', 'BOXING', 'CYCLING', 'ROWING', 'SKIING', 'DIVING', 'CLIMBING', 'ARCHERY', 'FENCING'],
+      ['FUSSBALL', 'TENNIS', 'HOCKEY', 'BOXEN', 'RADFAHREN', 'RUDERN', 'SKIFAHREN', 'TAUCHEN', 'KLETTERN', 'FECHTEN', 'TURNEN'],
+      ['FOOTBALL', 'TENNIS', 'HOCKEY', 'BOXE', 'CYCLISME', 'AVIRON', 'SKI', 'PLONGEE', 'ESCALADE', 'ESCRIME', 'GYMNASTIQUE'],
+      ['FUTBOL', 'TENIS', 'HOCKEY', 'BOXEO', 'CICLISMO', 'REMO', 'ESQUI', 'BUCEO', 'ESCALADA', 'ESGRIMA', 'GIMNASIA'],
+      ['CALCIO', 'TENNIS', 'HOCKEY', 'BOXE', 'CICLISMO', 'CANOTTAGGIO', 'SCI', 'TUFFO', 'ARRAMPICATA', 'SCHERMA', 'GINNASTICA']),
+    T(['Countries', 'Laender', 'Pays', 'Paises', 'Paesi'],
+      ['FRANCE', 'SPAIN', 'ITALY', 'GERMANY', 'BRAZIL', 'CANADA', 'JAPAN', 'EGYPT', 'INDIA', 'MEXICO', 'NORWAY'],
+      ['FRANKREICH', 'SPANIEN', 'ITALIEN', 'BRASILIEN', 'KANADA', 'JAPAN', 'AEGYPTEN', 'INDIEN', 'MEXIKO', 'NORWEGEN', 'CHINA'],
+      ['FRANCE', 'ESPAGNE', 'ITALIE', 'BRESIL', 'CANADA', 'JAPON', 'EGYPTE', 'INDE', 'MEXIQUE', 'NORVEGE', 'CHINE'],
+      ['FRANCIA', 'ESPANA', 'ITALIA', 'BRASIL', 'CANADA', 'JAPON', 'EGIPTO', 'INDIA', 'MEXICO', 'NORUEGA', 'CHINA'],
+      ['FRANCIA', 'SPAGNA', 'ITALIA', 'BRASILE', 'CANADA', 'GIAPPONE', 'EGITTO', 'INDIA', 'MESSICO', 'NORVEGIA', 'CINA']),
+    T(['Dinosaurs', 'Dinosaurier', 'Dinosaures', 'Dinosaurios', 'Dinosauri'],
+      ['TREX', 'RAPTOR', 'STEGOSAUR', 'FOSSIL', 'CLAW', 'JURASSIC', 'EXTINCT', 'HERBIVORE', 'CARNIVORE', 'AMBER', 'BONES'],
+      ['TREX', 'RAPTOR', 'STEGOSAURUS', 'FOSSIL', 'KRALLE', 'JURA', 'AUSGESTORBEN', 'PFLANZEN', 'RAUBTIER', 'BERNSTEIN', 'KNOCHEN'],
+      ['TREX', 'RAPTOR', 'STEGOSAURE', 'FOSSILE', 'GRIFFE', 'JURASSIQUE', 'DISPARU', 'HERBIVORE', 'CARNIVORE', 'AMBRE', 'OSSEMENTS'],
+      ['TREX', 'RAPTOR', 'ESTEGOSAURIO', 'FOSIL', 'GARRA', 'JURASICO', 'EXTINTO', 'HERBIVORO', 'CARNIVORO', 'AMBAR', 'HUESOS'],
+      ['TREX', 'RAPTOR', 'STEGOSAURO', 'FOSSILE', 'ARTIGLIO', 'GIURASSICO', 'ESTINTO', 'ERBIVORO', 'CARNIVORO', 'AMBRA', 'OSSA']),
+    T(['Music Genres', 'Musikstile', 'Genres Musicaux', 'Generos Musicales', 'Generi Musicali'],
+      ['ROCK', 'JAZZ', 'BLUES', 'POP', 'METAL', 'REGGAE', 'TECHNO', 'FOLK', 'SOUL', 'DISCO', 'CLASSICAL'],
+      ['ROCK', 'JAZZ', 'BLUES', 'POP', 'METAL', 'REGGAE', 'TECHNO', 'FOLK', 'SOUL', 'DISCO', 'KLASSIK'],
+      ['ROCK', 'JAZZ', 'BLUES', 'POP', 'METAL', 'REGGAE', 'TECHNO', 'FOLK', 'SOUL', 'DISCO', 'CLASSIQUE'],
+      ['ROCK', 'JAZZ', 'BLUES', 'POP', 'METAL', 'REGGAE', 'TECHNO', 'FOLK', 'SOUL', 'DISCO', 'CLASICA'],
+      ['ROCK', 'JAZZ', 'BLUES', 'POP', 'METAL', 'REGGAE', 'TECHNO', 'FOLK', 'SOUL', 'DISCO', 'CLASSICA']),
+    T(['Movies', 'Kino', 'Cinema', 'Cine', 'Cinema'],
+      ['ACTOR', 'CAMERA', 'SCRIPT', 'SCENE', 'DIRECTOR', 'STUDIO', 'TICKET', 'SCREEN', 'TRAILER', 'PREMIERE', 'POPCORN'],
+      ['SCHAUSPIELER', 'KAMERA', 'SKRIPT', 'SZENE', 'REGISSEUR', 'STUDIO', 'TICKET', 'LEINWAND', 'TRAILER', 'PREMIERE', 'POPCORN'],
+      ['ACTEUR', 'CAMERA', 'SCENARIO', 'SCENE', 'REALISATEUR', 'STUDIO', 'BILLET', 'ECRAN', 'BANDE', 'PREMIERE', 'POPCORN'],
+      ['ACTOR', 'CAMARA', 'GUION', 'ESCENA', 'DIRECTOR', 'ESTUDIO', 'ENTRADA', 'PANTALLA', 'TRAILER', 'ESTRENO', 'PALOMITAS'],
+      ['ATTORE', 'CAMERA', 'COPIONE', 'SCENA', 'REGISTA', 'STUDIO', 'BIGLIETTO', 'SCHERMO', 'TRAILER', 'PRIMA', 'POPCORN']),
+    T(['Mythical Creatures', 'Fabelwesen', 'Creatures', 'Criaturas', 'Creature'],
+      ['DRAGON', 'UNICORN', 'GRIFFIN', 'MERMAID', 'GOBLIN', 'OGRE', 'FAIRY', 'KRAKEN', 'PHOENIX', 'CENTAUR', 'TROLL'],
+      ['DRACHE', 'EINHORN', 'GREIF', 'MEERJUNGFRAU', 'KOBOLD', 'OGER', 'FEE', 'KRAKEN', 'PHOENIX', 'ZENTAUR', 'TROLL'],
+      ['DRAGON', 'LICORNE', 'GRIFFON', 'SIRENE', 'GOBELIN', 'OGRE', 'FEE', 'KRAKEN', 'PHENIX', 'CENTAURE', 'TROLL'],
+      ['DRAGON', 'UNICORNIO', 'GRIFO', 'SIRENA', 'DUENDE', 'OGRO', 'HADA', 'KRAKEN', 'FENIX', 'CENTAURO', 'TROL'],
+      ['DRAGO', 'UNICORNO', 'GRIFONE', 'SIRENA', 'GOBLIN', 'ORCO', 'FATA', 'KRAKEN', 'FENICE', 'CENTAURO', 'TROLL']),
+    T(['Nature', 'Natur', 'Nature', 'Naturaleza', 'Natura'],
+      ['FOREST', 'RIVER', 'MOUNTAIN', 'VALLEY', 'DESERT', 'MEADOW', 'CANYON', 'ISLAND', 'GLACIER', 'JUNGLE', 'PRAIRIE'],
+      ['WALD', 'FLUSS', 'BERG', 'TAL', 'WUESTE', 'WIESE', 'SCHLUCHT', 'INSEL', 'GLETSCHER', 'DSCHUNGEL', 'STEPPE'],
+      ['FORET', 'RIVIERE', 'MONTAGNE', 'VALLEE', 'DESERT', 'PRAIRIE', 'CANYON', 'ILE', 'GLACIER', 'JUNGLE', 'LAGON'],
+      ['BOSQUE', 'RIO', 'MONTANA', 'VALLE', 'DESIERTO', 'PRADO', 'CANON', 'ISLA', 'GLACIAR', 'SELVA', 'PRADERA'],
+      ['FORESTA', 'FIUME', 'MONTAGNA', 'VALLE', 'DESERTO', 'PRATO', 'CANYON', 'ISOLA', 'GHIACCIAIO', 'GIUNGLA', 'PRATERIA']),
+    T(['Travel', 'Reisen', 'Voyage', 'Viajes', 'Viaggi'],
+      ['AIRPORT', 'TICKET', 'PASSPORT', 'HOTEL', 'LUGGAGE', 'BEACH', 'CAMERA', 'MAP', 'TRAIN', 'JOURNEY', 'SUITCASE'],
+      ['FLUGHAFEN', 'TICKET', 'REISEPASS', 'HOTEL', 'GEPAECK', 'STRAND', 'KAMERA', 'KARTE', 'ZUG', 'REISE', 'KOFFER'],
+      ['AEROPORT', 'BILLET', 'PASSEPORT', 'HOTEL', 'BAGAGE', 'PLAGE', 'CAMERA', 'CARTE', 'TRAIN', 'VOYAGE', 'VALISE'],
+      ['AEROPUERTO', 'BILLETE', 'PASAPORTE', 'HOTEL', 'EQUIPAJE', 'PLAYA', 'CAMARA', 'MAPA', 'TREN', 'VIAJE', 'MALETA'],
+      ['AEROPORTO', 'BIGLIETTO', 'PASSAPORTO', 'HOTEL', 'BAGAGLIO', 'SPIAGGIA', 'CAMERA', 'MAPPA', 'TRENO', 'VIAGGIO', 'VALIGIA']),
+    T(['Technology', 'Technik', 'Technologie', 'Tecnologia', 'Tecnologia'],
+      ['SCREEN', 'BATTERY', 'CABLE', 'SENSOR', 'WIRELESS', 'CIRCUIT', 'BROWSER', 'CAMERA', 'SPEAKER', 'CHARGER', 'HEADSET'],
+      ['BILDSCHIRM', 'AKKU', 'KABEL', 'SENSOR', 'DRAHTLOS', 'SCHALTUNG', 'BROWSER', 'KAMERA', 'LAUTSPRECHER', 'LADER', 'HEADSET'],
+      ['ECRAN', 'BATTERIE', 'CABLE', 'CAPTEUR', 'SANSFIL', 'CIRCUIT', 'NAVIGATEUR', 'CAMERA', 'HAUTPARLEUR', 'CHARGEUR', 'CASQUE'],
+      ['PANTALLA', 'BATERIA', 'CABLE', 'SENSOR', 'INALAMBRICO', 'CIRCUITO', 'NAVEGADOR', 'CAMARA', 'ALTAVOZ', 'CARGADOR', 'AURICULAR'],
+      ['SCHERMO', 'BATTERIA', 'CAVO', 'SENSORE', 'WIRELESS', 'CIRCUITO', 'BROWSER', 'CAMERA', 'ALTOPARLANTE', 'CARICATORE', 'CUFFIA']),
+    T(['Professions', 'Berufe', 'Professions', 'Profesiones', 'Professioni'],
+      ['ENGINEER', 'LAWYER', 'TEACHER', 'PILOT', 'SURGEON', 'PLUMBER', 'ARCHITECT', 'JOURNALIST', 'ELECTRICIAN', 'SCIENTIST', 'FARMER'],
+      ['INGENIEUR', 'ANWALT', 'LEHRER', 'PILOT', 'CHIRURG', 'KLEMPNER', 'ARCHITEKT', 'JOURNALIST', 'ELEKTRIKER', 'FORSCHER', 'BAUER'],
+      ['INGENIEUR', 'AVOCAT', 'PROFESSEUR', 'PILOTE', 'CHIRURGIEN', 'PLOMBIER', 'ARCHITECTE', 'JOURNALISTE', 'ELECTRICIEN', 'CHERCHEUR', 'FERMIER'],
+      ['INGENIERO', 'ABOGADO', 'PROFESOR', 'PILOTO', 'CIRUJANO', 'FONTANERO', 'ARQUITECTO', 'PERIODISTA', 'ELECTRICISTA', 'CIENTIFICO', 'GRANJERO'],
+      ['INGEGNERE', 'AVVOCATO', 'INSEGNANTE', 'PILOTA', 'CHIRURGO', 'IDRAULICO', 'ARCHITETTO', 'GIORNALISTA', 'ELETTRICISTA', 'SCIENZIATO', 'CONTADINO']),
+    T(['Emotions', 'Gefuehle', 'Emotions', 'Emociones', 'Emozioni'],
+      ['HAPPY', 'ANGRY', 'PROUD', 'SCARED', 'CALM', 'JEALOUS', 'BORED', 'EXCITED', 'NERVOUS', 'JOYFUL', 'SHY'],
+      ['GLUECKLICH', 'WUETEND', 'STOLZ', 'AENGSTLICH', 'RUHIG', 'NEIDISCH', 'GELANGWEILT', 'AUFGEREGT', 'NERVOES', 'FROH', 'SCHUECHTERN'],
+      ['HEUREUX', 'FACHE', 'FIER', 'EFFRAYE', 'CALME', 'JALOUX', 'ENNUYE', 'EXCITE', 'NERVEUX', 'JOYEUX', 'TIMIDE'],
+      ['FELIZ', 'ENOJADO', 'ORGULLOSO', 'ASUSTADO', 'CALMADO', 'CELOSO', 'ABURRIDO', 'EMOCIONADO', 'NERVIOSO', 'ALEGRE', 'TIMIDO'],
+      ['FELICE', 'ARRABBIATO', 'ORGOGLIOSO', 'SPAVENTATO', 'CALMO', 'GELOSO', 'ANNOIATO', 'ECCITATO', 'NERVOSO', 'GIOIOSO', 'TIMIDO']),
+    T(['Hobbies', 'Hobbys', 'Loisirs', 'Aficiones', 'Hobby'],
+      ['READING', 'PAINTING', 'COOKING', 'DANCING', 'FISHING', 'HIKING', 'GARDENING', 'KNITTING', 'SINGING', 'CHESS', 'BAKING'],
+      ['LESEN', 'MALEN', 'KOCHEN', 'TANZEN', 'ANGELN', 'WANDERN', 'GAERTNERN', 'STRICKEN', 'SINGEN', 'SCHACH', 'BACKEN'],
+      ['LECTURE', 'PEINTURE', 'CUISINE', 'DANSE', 'PECHE', 'RANDONNEE', 'JARDINAGE', 'TRICOT', 'CHANT', 'ECHECS', 'PATISSERIE'],
+      ['LECTURA', 'PINTURA', 'COCINA', 'BAILE', 'PESCA', 'SENDERISMO', 'JARDINERIA', 'TEJER', 'CANTO', 'AJEDREZ', 'REPOSTERIA'],
+      ['LETTURA', 'PITTURA', 'CUCINA', 'BALLO', 'PESCA', 'ESCURSIONE', 'GIARDINAGGIO', 'MAGLIA', 'CANTO', 'SCACCHI', 'PASTICCERIA']),
+    T(['World Cuisine', 'Weltkueche', 'Cuisine', 'Cocina', 'Cucina'],
+      ['SUSHI', 'TACO', 'PASTA', 'CURRY', 'KEBAB', 'PAELLA', 'RAMEN', 'FALAFEL', 'GOULASH', 'BURRITO', 'RISOTTO'],
+      ['SUSHI', 'TACO', 'PASTA', 'CURRY', 'KEBAB', 'PAELLA', 'RAMEN', 'FALAFEL', 'GULASCH', 'BURRITO', 'RISOTTO'],
+      ['SUSHI', 'TACO', 'PATES', 'CURRY', 'KEBAB', 'PAELLA', 'RAMEN', 'FALAFEL', 'GOULASH', 'BURRITO', 'RISOTTO'],
+      ['SUSHI', 'TACO', 'PASTA', 'CURRY', 'KEBAB', 'PAELLA', 'RAMEN', 'FALAFEL', 'GULASH', 'BURRITO', 'RISOTTO'],
+      ['SUSHI', 'TACO', 'PASTA', 'CURRY', 'KEBAB', 'PAELLA', 'RAMEN', 'FALAFEL', 'GULASH', 'BURRITO', 'RISOTTO']),
+    T(['Camping', 'Camping', 'Camping', 'Acampada', 'Campeggio'],
+      ['TENT', 'CAMPFIRE', 'BACKPACK', 'LANTERN', 'COMPASS', 'FOREST', 'SLEEPING', 'MARSHMALLOW', 'TRAIL', 'MAP', 'FLASHLIGHT'],
+      ['ZELT', 'LAGERFEUER', 'RUCKSACK', 'LATERNE', 'KOMPASS', 'WALD', 'SCHLAFSACK', 'STOCKBROT', 'PFAD', 'KARTE', 'TASCHENLAMPE'],
+      ['TENTE', 'FEUDECAMP', 'SACADOS', 'LANTERNE', 'BOUSSOLE', 'FORET', 'SACDECOUCHAGE', 'GUIMAUVE', 'SENTIER', 'CARTE', 'LAMPE'],
+      ['TIENDA', 'HOGUERA', 'MOCHILA', 'FAROL', 'BRUJULA', 'BOSQUE', 'SACO', 'MALVAVISCO', 'SENDERO', 'MAPA', 'LINTERNA'],
+      ['TENDA', 'FALO', 'ZAINO', 'LANTERNA', 'BUSSOLA', 'FORESTA', 'SACCOPELO', 'MARSHMALLOW', 'SENTIERO', 'MAPPA', 'TORCIA']),
+    T(['Halloween', 'Halloween', 'Halloween', 'Halloween', 'Halloween'],
+      ['GHOST', 'WITCH', 'PUMPKIN', 'SPIDER', 'ZOMBIE', 'VAMPIRE', 'SKELETON', 'CANDY', 'BAT', 'SPOOKY', 'COSTUME'],
+      ['GESPENST', 'HEXE', 'KUERBIS', 'SPINNE', 'ZOMBIE', 'VAMPIR', 'SKELETT', 'BONBON', 'FLEDERMAUS', 'GRUSELIG', 'KOSTUEM'],
+      ['FANTOME', 'SORCIERE', 'CITROUILLE', 'ARAIGNEE', 'ZOMBIE', 'VAMPIRE', 'SQUELETTE', 'BONBON', 'CHAUVE', 'EFFRAYANT', 'COSTUME'],
+      ['FANTASMA', 'BRUJA', 'CALABAZA', 'ARANA', 'ZOMBI', 'VAMPIRO', 'ESQUELETO', 'CARAMELO', 'MURCIELAGO', 'TENEBROSO', 'DISFRAZ'],
+      ['FANTASMA', 'STREGA', 'ZUCCA', 'RAGNO', 'ZOMBIE', 'VAMPIRO', 'SCHELETRO', 'CARAMELLA', 'PIPISTRELLO', 'SPETTRALE', 'COSTUME']),
+    T(['Christmas', 'Weihnachten', 'Noel', 'Navidad', 'Natale'],
+      ['SANTA', 'REINDEER', 'SLEIGH', 'GIFT', 'STAR', 'CANDLE', 'HOLLY', 'SNOWMAN', 'STOCKING', 'WREATH', 'CAROL'],
+      ['WEIHNACHTSMANN', 'RENTIER', 'SCHLITTEN', 'GESCHENK', 'STERN', 'KERZE', 'STECHPALME', 'SCHNEEMANN', 'STRUMPF', 'KRANZ', 'LIED'],
+      ['PERENOEL', 'RENNE', 'TRAINEAU', 'CADEAU', 'ETOILE', 'BOUGIE', 'HOUX', 'BONHOMME', 'CHAUSSETTE', 'COURONNE', 'CHANT'],
+      ['PAPANOEL', 'RENO', 'TRINEO', 'REGALO', 'ESTRELLA', 'VELA', 'ACEBO', 'MUNECO', 'CALCETIN', 'CORONA', 'VILLANCICO'],
+      ['BABBONATALE', 'RENNA', 'SLITTA', 'REGALO', 'STELLA', 'CANDELA', 'AGRIFOGLIO', 'PUPAZZO', 'CALZA', 'GHIRLANDA', 'CANTO']),
+    T(['Jungle', 'Dschungel', 'Jungle', 'Selva', 'Giungla'],
+      ['TIGER', 'MONKEY', 'PARROT', 'SNAKE', 'JAGUAR', 'GORILLA', 'TOUCAN', 'LIANA', 'PANTHER', 'LEOPARD', 'FROG'],
+      ['TIGER', 'AFFE', 'PAPAGEI', 'SCHLANGE', 'JAGUAR', 'GORILLA', 'TUKAN', 'LIANE', 'PANTHER', 'LEOPARD', 'FROSCH'],
+      ['TIGRE', 'SINGE', 'PERROQUET', 'SERPENT', 'JAGUAR', 'GORILLE', 'TOUCAN', 'LIANE', 'PANTHERE', 'LEOPARD', 'GRENOUILLE'],
+      ['TIGRE', 'MONO', 'LORO', 'SERPIENTE', 'JAGUAR', 'GORILA', 'TUCAN', 'LIANA', 'PANTERA', 'LEOPARDO', 'RANA'],
+      ['TIGRE', 'SCIMMIA', 'PAPPAGALLO', 'SERPENTE', 'GIAGUARO', 'GORILLA', 'TUCANO', 'LIANA', 'PANTERA', 'LEOPARDO', 'RANA']),
+    T(['Fantasy', 'Fantasy', 'Fantasy', 'Fantasia', 'Fantasy'],
+      ['WIZARD', 'SWORD', 'CASTLE', 'POTION', 'KNIGHT', 'ELF', 'DWARF', 'SPELL', 'QUEST', 'DUNGEON', 'AMULET'],
+      ['ZAUBERER', 'SCHWERT', 'SCHLOSS', 'TRANK', 'RITTER', 'ELF', 'ZWERG', 'ZAUBER', 'QUEST', 'VERLIES', 'AMULETT'],
+      ['SORCIER', 'EPEE', 'CHATEAU', 'POTION', 'CHEVALIER', 'ELFE', 'NAIN', 'SORT', 'QUETE', 'DONJON', 'AMULETTE'],
+      ['MAGO', 'ESPADA', 'CASTILLO', 'POCION', 'CABALLERO', 'ELFO', 'ENANO', 'HECHIZO', 'MISION', 'MAZMORRA', 'AMULETO'],
+      ['MAGO', 'SPADA', 'CASTELLO', 'POZIONE', 'CAVALIERE', 'ELFO', 'NANO', 'INCANTESIMO', 'MISSIONE', 'SOTTERRANEO', 'AMULETO']),
+    T(['Human Body', 'Koerper', 'Corps Humain', 'Cuerpo Humano', 'Corpo Umano'],
+      ['HEART', 'LUNG', 'BRAIN', 'LIVER', 'KIDNEY', 'BONE', 'MUSCLE', 'STOMACH', 'SPINE', 'NERVE', 'SKIN'],
+      ['HERZ', 'LUNGE', 'GEHIRN', 'LEBER', 'NIERE', 'KNOCHEN', 'MUSKEL', 'MAGEN', 'WIRBEL', 'NERV', 'HAUT'],
+      ['COEUR', 'POUMON', 'CERVEAU', 'FOIE', 'REIN', 'OS', 'MUSCLE', 'ESTOMAC', 'COLONNE', 'NERF', 'PEAU'],
+      ['CORAZON', 'PULMON', 'CEREBRO', 'HIGADO', 'RINON', 'HUESO', 'MUSCULO', 'ESTOMAGO', 'COLUMNA', 'NERVIO', 'PIEL'],
+      ['CUORE', 'POLMONE', 'CERVELLO', 'FEGATO', 'RENE', 'OSSO', 'MUSCOLO', 'STOMACO', 'COLONNA', 'NERVO', 'PELLE']),
+    T(['Fashion', 'Mode', 'Mode', 'Moda', 'Moda'],
+      ['DRESS', 'JACKET', 'BOOTS', 'SCARF', 'BLAZER', 'DENIM', 'LEATHER', 'PATTERN', 'RUNWAY', 'TAILOR', 'VELVET'],
+      ['KLEID', 'JACKE', 'STIEFEL', 'SCHAL', 'BLAZER', 'DENIM', 'LEDER', 'MUSTER', 'LAUFSTEG', 'SCHNEIDER', 'SAMT'],
+      ['ROBE', 'VESTE', 'BOTTES', 'ECHARPE', 'BLAZER', 'DENIM', 'CUIR', 'MOTIF', 'PODIUM', 'TAILLEUR', 'VELOURS'],
+      ['VESTIDO', 'CHAQUETA', 'BOTAS', 'BUFANDA', 'BLAZER', 'VAQUERO', 'CUERO', 'PATRON', 'PASARELA', 'SASTRE', 'TERCIOPELO'],
+      ['VESTITO', 'GIACCA', 'STIVALI', 'SCIARPA', 'BLAZER', 'DENIM', 'PELLE', 'MOTIVO', 'PASSERELLA', 'SARTO', 'VELLUTO']),
+  ],
+  hard: [
+    T(['Artificial Intelligence', 'Kuenstliche Intelligenz', 'Intelligence Artificielle', 'Inteligencia Artificial', 'Intelligenza Artificiale'],
+      ['NEURAL', 'NETWORK', 'TENSOR', 'GRADIENT', 'MODEL', 'TRAINING', 'DATASET', 'INFERENCE', 'ROBOT', 'ALGORITHM', 'LEARNING', 'TRANSFORMER'],
+      ['NEURONAL', 'NETZWERK', 'TENSOR', 'GRADIENT', 'MODELL', 'TRAINING', 'DATENSATZ', 'INFERENZ', 'ROBOTER', 'ALGORITHMUS', 'LERNEN', 'TRANSFORMER'],
+      ['NEURONE', 'RESEAU', 'TENSEUR', 'GRADIENT', 'MODELE', 'DONNEES', 'INFERENCE', 'ROBOT', 'ALGORITHME', 'APPRENTISSAGE', 'TRANSFORMEUR', 'PREDICTION'],
+      ['NEURONAL', 'RED', 'TENSOR', 'GRADIENTE', 'MODELO', 'ENTRENAMIENTO', 'DATOS', 'INFERENCIA', 'ROBOT', 'ALGORITMO', 'APRENDIZAJE', 'TRANSFORMADOR'],
+      ['NEURALE', 'RETE', 'TENSORE', 'GRADIENTE', 'MODELLO', 'ADDESTRAMENTO', 'DATI', 'INFERENZA', 'ROBOT', 'ALGORITMO', 'APPRENDIMENTO', 'TRASFORMATORE']),
+    T(['Computers', 'Computer', 'Informatique', 'Ordenadores', 'Computer'],
+      ['KEYBOARD', 'MEMORY', 'PROCESSOR', 'BINARY', 'COMPILER', 'KERNEL', 'NETWORK', 'VARIABLE', 'FUNCTION', 'POINTER', 'DATABASE', 'ENCRYPTION'],
+      ['TASTATUR', 'SPEICHER', 'PROZESSOR', 'BINAER', 'COMPILER', 'KERNEL', 'NETZWERK', 'VARIABLE', 'FUNKTION', 'ZEIGER', 'DATENBANK', 'SCHLEIFE'],
+      ['CLAVIER', 'MEMOIRE', 'PROCESSEUR', 'BINAIRE', 'COMPILATEUR', 'NOYAU', 'RESEAU', 'VARIABLE', 'FONCTION', 'POINTEUR', 'CHIFFREMENT', 'BOUCLE'],
+      ['TECLADO', 'MEMORIA', 'PROCESADOR', 'BINARIO', 'COMPILADOR', 'NUCLEO', 'RED', 'VARIABLE', 'FUNCION', 'PUNTERO', 'BUCLE', 'CIFRADO'],
+      ['TASTIERA', 'MEMORIA', 'PROCESSORE', 'BINARIO', 'COMPILATORE', 'NUCLEO', 'RETE', 'VARIABILE', 'FUNZIONE', 'PUNTATORE', 'CICLO', 'CIFRATURA']),
+    T(['Mythology', 'Mythologie', 'Mythologie', 'Mitologia', 'Mitologia'],
+      ['TITAN', 'ORACLE', 'PHOENIX', 'OLYMPUS', 'TRIDENT', 'MEDUSA', 'PEGASUS', 'LEGEND', 'HERCULES', 'DRAGON', 'CHIMERA', 'LABYRINTH'],
+      ['TITAN', 'ORAKEL', 'PHOENIX', 'OLYMP', 'DREIZACK', 'MEDUSA', 'PEGASUS', 'LEGENDE', 'HERKULES', 'DRACHE', 'CHIMAERE', 'LABYRINTH'],
+      ['TITAN', 'ORACLE', 'PHENIX', 'OLYMPE', 'TRIDENT', 'MEDUSE', 'PEGASE', 'LEGENDE', 'HERCULE', 'DRAGON', 'CHIMERE', 'LABYRINTHE'],
+      ['TITAN', 'ORACULO', 'FENIX', 'OLIMPO', 'TRIDENTE', 'MEDUSA', 'PEGASO', 'LEYENDA', 'HERCULES', 'DRAGON', 'QUIMERA', 'LABERINTO'],
+      ['TITANO', 'ORACOLO', 'FENICE', 'OLIMPO', 'TRIDENTE', 'MEDUSA', 'PEGASO', 'LEGGENDA', 'ERCOLE', 'DRAGO', 'CHIMERA', 'LABIRINTO']),
+    T(['Chemistry', 'Chemie', 'Chimie', 'Quimica', 'Chimica'],
+      ['ATOM', 'MOLECULE', 'ELECTRON', 'PROTON', 'REACTION', 'CATALYST', 'ACID', 'ALKALINE', 'ISOTOPE', 'COMPOUND', 'SOLUTION', 'ELEMENT'],
+      ['ATOM', 'MOLEKUEL', 'ELEKTRON', 'PROTON', 'REAKTION', 'KATALYSATOR', 'SAEURE', 'BASE', 'ISOTOP', 'VERBINDUNG', 'LOESUNG', 'ELEMENT'],
+      ['ATOME', 'MOLECULE', 'ELECTRON', 'PROTON', 'REACTION', 'CATALYSEUR', 'ACIDE', 'BASE', 'ISOTOPE', 'COMPOSE', 'SOLUTION', 'ELEMENT'],
+      ['ATOMO', 'MOLECULA', 'ELECTRON', 'PROTON', 'REACCION', 'CATALIZADOR', 'ACIDO', 'BASE', 'ISOTOPO', 'COMPUESTO', 'SOLUCION', 'ELEMENTO'],
+      ['ATOMO', 'MOLECOLA', 'ELETTRONE', 'PROTONE', 'REAZIONE', 'CATALIZZATORE', 'ACIDO', 'BASE', 'ISOTOPO', 'COMPOSTO', 'SOLUZIONE', 'ELEMENTO']),
+    T(['Astronomy', 'Astronomie', 'Astronomie', 'Astronomia', 'Astronomia'],
+      ['NEBULA', 'QUASAR', 'PULSAR', 'ECLIPSE', 'ASTEROID', 'SUPERNOVA', 'TELESCOPE', 'GALAXY', 'COMET', 'ORBIT', 'BLACKHOLE', 'MERIDIAN'],
+      ['NEBEL', 'QUASAR', 'PULSAR', 'FINSTERNIS', 'ASTEROID', 'SUPERNOVA', 'TELESKOP', 'GALAXIE', 'KOMET', 'ORBIT', 'STERNBILD', 'MERIDIAN'],
+      ['NEBULEUSE', 'QUASAR', 'PULSAR', 'ECLIPSE', 'ASTEROIDE', 'SUPERNOVA', 'TELESCOPE', 'GALAXIE', 'COMETE', 'ORBITE', 'CONSTELLATION', 'MERIDIEN'],
+      ['NEBULOSA', 'QUASAR', 'PULSAR', 'ECLIPSE', 'ASTEROIDE', 'SUPERNOVA', 'TELESCOPIO', 'GALAXIA', 'COMETA', 'ORBITA', 'CONSTELACION', 'MERIDIANO'],
+      ['NEBULOSA', 'QUASAR', 'PULSAR', 'ECLISSI', 'ASTEROIDE', 'SUPERNOVA', 'TELESCOPIO', 'GALASSIA', 'COMETA', 'ORBITA', 'COSTELLAZIONE', 'MERIDIANO']),
+    T(['Geography', 'Geografie', 'Geographie', 'Geografia', 'Geografia'],
+      ['CONTINENT', 'PENINSULA', 'PLATEAU', 'ARCHIPELAGO', 'ISTHMUS', 'LATITUDE', 'EQUATOR', 'GLACIER', 'TROPICS', 'DELTA', 'PLAIN', 'SUMMIT'],
+      ['KONTINENT', 'HALBINSEL', 'PLATEAU', 'ARCHIPEL', 'ISTHMUS', 'BREITENGRAD', 'AEQUATOR', 'GLETSCHER', 'TROPEN', 'DELTA', 'EBENE', 'GIPFEL'],
+      ['CONTINENT', 'PENINSULE', 'PLATEAU', 'ARCHIPEL', 'ISTHME', 'LATITUDE', 'EQUATEUR', 'GLACIER', 'TROPIQUES', 'DELTA', 'PLAINE', 'SOMMET'],
+      ['CONTINENTE', 'PENINSULA', 'MESETA', 'ARCHIPIELAGO', 'ISTMO', 'LATITUD', 'ECUADOR', 'GLACIAR', 'TROPICOS', 'DELTA', 'LLANURA', 'CUMBRE'],
+      ['CONTINENTE', 'PENISOLA', 'ALTOPIANO', 'ARCIPELAGO', 'ISTMO', 'LATITUDINE', 'EQUATORE', 'GHIACCIAIO', 'TROPICI', 'DELTA', 'PIANURA', 'VETTA']),
+    T(['History', 'Geschichte', 'Histoire', 'Historia', 'Storia'],
+      ['EMPIRE', 'DYNASTY', 'REVOLUTION', 'MONARCHY', 'TREATY', 'CRUSADE', 'PHARAOH', 'FEUDAL', 'CONQUEST', 'ANCIENT', 'CENTURY', 'RENAISSANCE'],
+      ['IMPERIUM', 'DYNASTIE', 'REVOLUTION', 'MONARCHIE', 'VERTRAG', 'KREUZZUG', 'PHARAO', 'FEUDAL', 'EROBERUNG', 'ANTIKE', 'JAHRHUNDERT', 'RENAISSANCE'],
+      ['EMPIRE', 'DYNASTIE', 'REVOLUTION', 'MONARCHIE', 'TRAITE', 'CROISADE', 'PHARAON', 'FEODAL', 'CONQUETE', 'ANTIQUITE', 'SIECLE', 'RENAISSANCE'],
+      ['IMPERIO', 'DINASTIA', 'REVOLUCION', 'MONARQUIA', 'TRATADO', 'CRUZADA', 'FARAON', 'FEUDAL', 'CONQUISTA', 'ANTIGUEDAD', 'SIGLO', 'RENACIMIENTO'],
+      ['IMPERO', 'DINASTIA', 'RIVOLUZIONE', 'MONARCHIA', 'TRATTATO', 'CROCIATA', 'FARAONE', 'FEUDALE', 'CONQUISTA', 'ANTICHITA', 'SECOLO', 'RINASCIMENTO']),
+    T(['Medicine', 'Medizin', 'Medecine', 'Medicina', 'Medicina'],
+      ['SURGERY', 'VACCINE', 'ANTIBODY', 'DIAGNOSIS', 'SYMPTOM', 'THERAPY', 'ANATOMY', 'BACTERIA', 'ARTERY', 'HORMONE', 'IMMUNE', 'SYRINGE'],
+      ['CHIRURGIE', 'IMPFSTOFF', 'ANTIKOERPER', 'DIAGNOSE', 'SYMPTOM', 'THERAPIE', 'ANATOMIE', 'BAKTERIEN', 'ARTERIE', 'HORMON', 'IMMUN', 'SPRITZE'],
+      ['CHIRURGIE', 'VACCIN', 'ANTICORPS', 'DIAGNOSTIC', 'SYMPTOME', 'THERAPIE', 'ANATOMIE', 'BACTERIE', 'ARTERE', 'HORMONE', 'IMMUNITE', 'SERINGUE'],
+      ['CIRUGIA', 'VACUNA', 'ANTICUERPO', 'DIAGNOSTICO', 'SINTOMA', 'TERAPIA', 'ANATOMIA', 'BACTERIA', 'ARTERIA', 'HORMONA', 'INMUNE', 'JERINGA'],
+      ['CHIRURGIA', 'VACCINO', 'ANTICORPO', 'DIAGNOSI', 'SINTOMO', 'TERAPIA', 'ANATOMIA', 'BATTERIO', 'ARTERIA', 'ORMONE', 'IMMUNE', 'SIRINGA']),
+    T(['Physics', 'Physik', 'Physique', 'Fisica', 'Fisica'],
+      ['ENERGY', 'FORCE', 'MOMENTUM', 'FRICTION', 'GRAVITY', 'QUANTUM', 'VELOCITY', 'PARTICLE', 'MAGNETISM', 'VOLTAGE', 'PHOTON', 'ENTROPY'],
+      ['ENERGIE', 'KRAFT', 'IMPULS', 'REIBUNG', 'SCHWERKRAFT', 'QUANTUM', 'GESCHWINDIGKEIT', 'TEILCHEN', 'MAGNETISMUS', 'SPANNUNG', 'PHOTON', 'ENTROPIE'],
+      ['ENERGIE', 'FORCE', 'MOMENTUM', 'FROTTEMENT', 'GRAVITE', 'QUANTIQUE', 'VITESSE', 'PARTICULE', 'MAGNETISME', 'TENSION', 'PHOTON', 'ENTROPIE'],
+      ['ENERGIA', 'FUERZA', 'MOMENTO', 'FRICCION', 'GRAVEDAD', 'CUANTICO', 'VELOCIDAD', 'PARTICULA', 'MAGNETISMO', 'VOLTAJE', 'FOTON', 'ENTROPIA'],
+      ['ENERGIA', 'FORZA', 'MOMENTO', 'ATTRITO', 'GRAVITA', 'QUANTISTICO', 'VELOCITA', 'PARTICELLA', 'MAGNETISMO', 'TENSIONE', 'FOTONE', 'ENTROPIA']),
+    T(['Mathematics', 'Mathematik', 'Mathematiques', 'Matematicas', 'Matematica'],
+      ['ALGEBRA', 'GEOMETRY', 'INTEGRAL', 'MATRIX', 'VECTOR', 'THEOREM', 'FUNCTION', 'DERIVATIVE', 'POLYNOMIAL', 'FRACTION', 'EQUATION', 'PROBABILITY'],
+      ['ALGEBRA', 'GEOMETRIE', 'INTEGRAL', 'MATRIX', 'VEKTOR', 'THEOREM', 'FUNKTION', 'ABLEITUNG', 'POLYNOM', 'BRUCH', 'GLEICHUNG', 'WAHRSCHEINLICHKEIT'],
+      ['ALGEBRE', 'GEOMETRIE', 'INTEGRALE', 'MATRICE', 'VECTEUR', 'THEOREME', 'FONCTION', 'DERIVEE', 'POLYNOME', 'FRACTION', 'EQUATION', 'PROBABILITE'],
+      ['ALGEBRA', 'GEOMETRIA', 'INTEGRAL', 'MATRIZ', 'VECTOR', 'TEOREMA', 'FUNCION', 'DERIVADA', 'POLINOMIO', 'FRACCION', 'ECUACION', 'PROBABILIDAD'],
+      ['ALGEBRA', 'GEOMETRIA', 'INTEGRALE', 'MATRICE', 'VETTORE', 'TEOREMA', 'FUNZIONE', 'DERIVATA', 'POLINOMIO', 'FRAZIONE', 'EQUAZIONE', 'PROBABILITA']),
+    T(['Programming', 'Programmierung', 'Programmation', 'Programacion', 'Programmazione'],
+      ['PYTHON', 'JAVA', 'RUST', 'KOTLIN', 'SWIFT', 'HASKELL', 'RUBY', 'SCALA', 'PROLOG', 'COBOL', 'FORTRAN', 'JAVASCRIPT'],
+      ['PYTHON', 'JAVA', 'RUST', 'KOTLIN', 'SWIFT', 'HASKELL', 'RUBY', 'SCALA', 'PROLOG', 'COBOL', 'FORTRAN', 'JAVASCRIPT'],
+      ['PYTHON', 'JAVA', 'RUST', 'KOTLIN', 'SWIFT', 'HASKELL', 'RUBY', 'SCALA', 'PROLOG', 'COBOL', 'FORTRAN', 'JAVASCRIPT'],
+      ['PYTHON', 'JAVA', 'RUST', 'KOTLIN', 'SWIFT', 'HASKELL', 'RUBY', 'SCALA', 'PROLOG', 'COBOL', 'FORTRAN', 'JAVASCRIPT'],
+      ['PYTHON', 'JAVA', 'RUST', 'KOTLIN', 'SWIFT', 'HASKELL', 'RUBY', 'SCALA', 'PROLOG', 'COBOL', 'FORTRAN', 'JAVASCRIPT']),
+    T(['Cybersecurity', 'Cybersicherheit', 'Cybersecurite', 'Ciberseguridad', 'Cybersicurezza'],
+      ['FIREWALL', 'MALWARE', 'PHISHING', 'ENCRYPTION', 'PASSWORD', 'EXPLOIT', 'RANSOMWARE', 'BREACH', 'HACKER', 'PAYLOAD', 'BACKDOOR', 'PROTOCOL'],
+      ['FIREWALL', 'SCHADSOFTWARE', 'PHISHING', 'VERSCHLUESSELUNG', 'PASSWORT', 'EXPLOIT', 'ERPRESSUNG', 'DATENLECK', 'HACKER', 'NUTZLAST', 'HINTERTUER', 'PROTOKOLL'],
+      ['PAREFEU', 'MALICIEL', 'HAMECONNAGE', 'CHIFFREMENT', 'MOTDEPASSE', 'EXPLOIT', 'RANCONGICIEL', 'FUITE', 'PIRATE', 'CHARGE', 'PORTEDEROBEE', 'PROTOCOLE'],
+      ['CORTAFUEGOS', 'MALWARE', 'PHISHING', 'CIFRADO', 'CONTRASENA', 'EXPLOIT', 'RANSOMWARE', 'FILTRACION', 'HACKER', 'CARGA', 'PUERTATRASERA', 'PROTOCOLO'],
+      ['FIREWALL', 'MALWARE', 'PHISHING', 'CRITTOGRAFIA', 'PASSWORD', 'EXPLOIT', 'RANSOMWARE', 'VIOLAZIONE', 'HACKER', 'CARICO', 'BACKDOOR', 'PROTOCOLLO']),
+    T(['Economics', 'Wirtschaft', 'Economie', 'Economia', 'Economia'],
+      ['INFLATION', 'MARKET', 'CAPITAL', 'DEMAND', 'SUPPLY', 'RECESSION', 'DIVIDEND', 'INTEREST', 'TARIFF', 'MONOPOLY', 'CURRENCY', 'SUBSIDY'],
+      ['INFLATION', 'MARKT', 'KAPITAL', 'NACHFRAGE', 'ANGEBOT', 'REZESSION', 'DIVIDENDE', 'ZINSEN', 'ZOLL', 'MONOPOL', 'WAEHRUNG', 'SUBVENTION'],
+      ['INFLATION', 'MARCHE', 'CAPITAL', 'DEMANDE', 'OFFRE', 'RECESSION', 'DIVIDENDE', 'INTERET', 'TARIF', 'MONOPOLE', 'MONNAIE', 'SUBVENTION'],
+      ['INFLACION', 'MERCADO', 'CAPITAL', 'DEMANDA', 'OFERTA', 'RECESION', 'DIVIDENDO', 'INTERES', 'ARANCEL', 'MONOPOLIO', 'MONEDA', 'SUBSIDIO'],
+      ['INFLAZIONE', 'MERCATO', 'CAPITALE', 'DOMANDA', 'OFFERTA', 'RECESSIONE', 'DIVIDENDO', 'INTERESSE', 'TARIFFA', 'MONOPOLIO', 'VALUTA', 'SUSSIDIO']),
+    T(['Psychology', 'Psychologie', 'Psychologie', 'Psicologia', 'Psicologia'],
+      ['MEMORY', 'EMOTION', 'BEHAVIOR', 'COGNITION', 'INSTINCT', 'THERAPY', 'ANXIETY', 'PERCEPTION', 'MOTIVATION', 'TRAUMA', 'EMPATHY', 'STIMULUS'],
+      ['GEDAECHTNIS', 'EMOTION', 'VERHALTEN', 'KOGNITION', 'INSTINKT', 'THERAPIE', 'ANGST', 'WAHRNEHMUNG', 'MOTIVATION', 'TRAUMA', 'EMPATHIE', 'REIZ'],
+      ['MEMOIRE', 'EMOTION', 'COMPORTEMENT', 'COGNITION', 'INSTINCT', 'THERAPIE', 'ANXIETE', 'PERCEPTION', 'MOTIVATION', 'TRAUMA', 'EMPATHIE', 'STIMULUS'],
+      ['MEMORIA', 'EMOCION', 'CONDUCTA', 'COGNICION', 'INSTINTO', 'TERAPIA', 'ANSIEDAD', 'PERCEPCION', 'MOTIVACION', 'TRAUMA', 'EMPATIA', 'ESTIMULO'],
+      ['MEMORIA', 'EMOZIONE', 'COMPORTAMENTO', 'COGNIZIONE', 'ISTINTO', 'TERAPIA', 'ANSIA', 'PERCEZIONE', 'MOTIVAZIONE', 'TRAUMA', 'EMPATIA', 'STIMOLO']),
+    T(['Philosophy', 'Philosophie', 'Philosophie', 'Filosofia', 'Filosofia'],
+      ['ETHICS', 'LOGIC', 'REASON', 'VIRTUE', 'EXISTENCE', 'FREEDOM', 'JUSTICE', 'TRUTH', 'MORALITY', 'DIALECTIC', 'WISDOM', 'METAPHYSICS'],
+      ['ETHIK', 'LOGIK', 'VERNUNFT', 'TUGEND', 'EXISTENZ', 'FREIHEIT', 'GERECHTIGKEIT', 'WAHRHEIT', 'MORAL', 'DIALEKTIK', 'WEISHEIT', 'METAPHYSIK'],
+      ['ETHIQUE', 'LOGIQUE', 'RAISON', 'VERTU', 'EXISTENCE', 'LIBERTE', 'JUSTICE', 'VERITE', 'MORALE', 'DIALECTIQUE', 'SAGESSE', 'METAPHYSIQUE'],
+      ['ETICA', 'LOGICA', 'RAZON', 'VIRTUD', 'EXISTENCIA', 'LIBERTAD', 'JUSTICIA', 'VERDAD', 'MORAL', 'DIALECTICA', 'SABIDURIA', 'METAFISICA'],
+      ['ETICA', 'LOGICA', 'RAGIONE', 'VIRTU', 'ESISTENZA', 'LIBERTA', 'GIUSTIZIA', 'VERITA', 'MORALE', 'DIALETTICA', 'SAGGEZZA', 'METAFISICA']),
+    T(['Literature', 'Literatur', 'Litterature', 'Literatura', 'Letteratura'],
+      ['NOVEL', 'POEM', 'METAPHOR', 'NARRATOR', 'CHAPTER', 'PROLOGUE', 'CHARACTER', 'PLOT', 'STANZA', 'ALLEGORY', 'SATIRE', 'PROTAGONIST'],
+      ['ROMAN', 'GEDICHT', 'METAPHER', 'ERZAEHLER', 'KAPITEL', 'PROLOG', 'FIGUR', 'HANDLUNG', 'STROPHE', 'ALLEGORIE', 'SATIRE', 'PROTAGONIST'],
+      ['ROMAN', 'POEME', 'METAPHORE', 'NARRATEUR', 'CHAPITRE', 'PROLOGUE', 'PERSONNAGE', 'INTRIGUE', 'STROPHE', 'ALLEGORIE', 'SATIRE', 'PROTAGONISTE'],
+      ['NOVELA', 'POEMA', 'METAFORA', 'NARRADOR', 'CAPITULO', 'PROLOGO', 'PERSONAJE', 'TRAMA', 'ESTROFA', 'ALEGORIA', 'SATIRA', 'PROTAGONISTA'],
+      ['ROMANZO', 'POESIA', 'METAFORA', 'NARRATORE', 'CAPITOLO', 'PROLOGO', 'PERSONAGGIO', 'TRAMA', 'STROFA', 'ALLEGORIA', 'SATIRA', 'PROTAGONISTA']),
+    T(['Architecture', 'Architektur', 'Architecture', 'Arquitectura', 'Architettura'],
+      ['COLUMN', 'ARCH', 'FACADE', 'VAULT', 'DOME', 'BALCONY', 'PILLAR', 'CORNICE', 'BUTTRESS', 'ATRIUM', 'GABLE', 'PORTICO'],
+      ['SAEULE', 'BOGEN', 'FASSADE', 'GEWOELBE', 'KUPPEL', 'BALKON', 'PFEILER', 'GESIMS', 'STREBEPFEILER', 'ATRIUM', 'GIEBEL', 'PORTIKUS'],
+      ['COLONNE', 'ARCHE', 'FACADE', 'VOUTE', 'DOME', 'BALCON', 'PILIER', 'CORNICHE', 'CONTREFORT', 'ATRIUM', 'PIGNON', 'PORTIQUE'],
+      ['COLUMNA', 'ARCO', 'FACHADA', 'BOVEDA', 'CUPULA', 'BALCON', 'PILAR', 'CORNISA', 'CONTRAFUERTE', 'ATRIO', 'FRONTON', 'PORTICO'],
+      ['COLONNA', 'ARCO', 'FACCIATA', 'VOLTA', 'CUPOLA', 'BALCONE', 'PILASTRO', 'CORNICE', 'CONTRAFFORTE', 'ATRIO', 'TIMPANO', 'PORTICO']),
+    T(['Art Movements', 'Kunststile', 'Mouvements Art', 'Movimientos Arte', 'Movimenti Arte'],
+      ['CUBISM', 'BAROQUE', 'REALISM', 'DADAISM', 'GOTHIC', 'ROMANTICISM', 'MINIMALISM', 'SURREALISM', 'IMPRESSIONISM', 'POPART', 'FUTURISM', 'RENAISSANCE'],
+      ['KUBISMUS', 'BAROCK', 'REALISMUS', 'DADAISMUS', 'GOTIK', 'ROMANTIK', 'MINIMALISMUS', 'SURREALISMUS', 'IMPRESSIONISMUS', 'POPART', 'FUTURISMUS', 'RENAISSANCE'],
+      ['CUBISME', 'BAROQUE', 'REALISME', 'DADAISME', 'GOTHIQUE', 'ROMANTISME', 'MINIMALISME', 'SURREALISME', 'IMPRESSIONNISME', 'POPART', 'FUTURISME', 'RENAISSANCE'],
+      ['CUBISMO', 'BARROCO', 'REALISMO', 'DADAISMO', 'GOTICO', 'ROMANTICISMO', 'MINIMALISMO', 'SURREALISMO', 'IMPRESIONISMO', 'POPART', 'FUTURISMO', 'RENACIMIENTO'],
+      ['CUBISMO', 'BAROCCO', 'REALISMO', 'DADAISMO', 'GOTICO', 'ROMANTICISMO', 'MINIMALISMO', 'SURREALISMO', 'IMPRESSIONISMO', 'POPART', 'FUTURISMO', 'RINASCIMENTO']),
+    T(['World Capitals', 'Hauptstaedte', 'Capitales', 'Capitales', 'Capitali'],
+      ['PARIS', 'MADRID', 'BERLIN', 'ROME', 'LONDON', 'TOKYO', 'OTTAWA', 'CAIRO', 'LISBON', 'VIENNA', 'ATHENS', 'CANBERRA'],
+      ['PARIS', 'MADRID', 'BERLIN', 'ROM', 'LONDON', 'TOKIO', 'OTTAWA', 'KAIRO', 'LISSABON', 'WIEN', 'ATHEN', 'CANBERRA'],
+      ['PARIS', 'MADRID', 'BERLIN', 'ROME', 'LONDRES', 'TOKYO', 'OTTAWA', 'LECAIRE', 'LISBONNE', 'VIENNE', 'ATHENES', 'CANBERRA'],
+      ['PARIS', 'MADRID', 'BERLIN', 'ROMA', 'LONDRES', 'TOKIO', 'OTAWA', 'ELCAIRO', 'LISBOA', 'VIENA', 'ATENAS', 'CANBERRA'],
+      ['PARIGI', 'MADRID', 'BERLINO', 'ROMA', 'LONDRA', 'TOKYO', 'OTTAWA', 'ILCAIRO', 'LISBONA', 'VIENNA', 'ATENE', 'CANBERRA']),
+    T(['Gemstones', 'Edelsteine', 'Pierres', 'Gemas', 'Gemme'],
+      ['DIAMOND', 'RUBY', 'EMERALD', 'SAPPHIRE', 'OPAL', 'TOPAZ', 'AMETHYST', 'GARNET', 'JADE', 'PEARL', 'ONYX', 'TURQUOISE'],
+      ['DIAMANT', 'RUBIN', 'SMARAGD', 'SAPHIR', 'OPAL', 'TOPAS', 'AMETHYST', 'GRANAT', 'JADE', 'PERLE', 'ONYX', 'TUERKIS'],
+      ['DIAMANT', 'RUBIS', 'EMERAUDE', 'SAPHIR', 'OPALE', 'TOPAZE', 'AMETHYSTE', 'GRENAT', 'JADE', 'PERLE', 'ONYX', 'TURQUOISE'],
+      ['DIAMANTE', 'RUBI', 'ESMERALDA', 'ZAFIRO', 'OPALO', 'TOPACIO', 'AMATISTA', 'GRANATE', 'JADE', 'PERLA', 'ONICE', 'TURQUESA'],
+      ['DIAMANTE', 'RUBINO', 'SMERALDO', 'ZAFFIRO', 'OPALE', 'TOPAZIO', 'AMETISTA', 'GRANATO', 'GIADA', 'PERLA', 'ONICE', 'TURCHESE']),
+    T(['Ancient Civilizations', 'Antike Kulturen', 'Civilisations', 'Civilizaciones', 'Civilta Antiche'],
+      ['EGYPT', 'ROME', 'GREECE', 'MAYA', 'AZTEC', 'PERSIA', 'BABYLON', 'SUMER', 'INCA', 'PHOENICIA', 'CARTHAGE', 'MESOPOTAMIA'],
+      ['AEGYPTEN', 'ROM', 'GRIECHENLAND', 'MAYA', 'AZTEKEN', 'PERSIEN', 'BABYLON', 'SUMER', 'INKA', 'PHOENIZIEN', 'KARTHAGO', 'MESOPOTAMIEN'],
+      ['EGYPTE', 'ROME', 'GRECE', 'MAYA', 'AZTEQUE', 'PERSE', 'BABYLONE', 'SUMER', 'INCA', 'PHENICIE', 'CARTHAGE', 'MESOPOTAMIE'],
+      ['EGIPTO', 'ROMA', 'GRECIA', 'MAYA', 'AZTECA', 'PERSIA', 'BABILONIA', 'SUMER', 'INCA', 'FENICIA', 'CARTAGO', 'MESOPOTAMIA'],
+      ['EGITTO', 'ROMA', 'GRECIA', 'MAYA', 'AZTECHI', 'PERSIA', 'BABILONIA', 'SUMER', 'INCA', 'FENICIA', 'CARTAGINE', 'MESOPOTAMIA']),
+    T(['Meteorology', 'Meteorologie', 'Meteorologie', 'Meteorologia', 'Meteorologia'],
+      ['CYCLONE', 'HUMIDITY', 'PRESSURE', 'FORECAST', 'MONSOON', 'DROUGHT', 'BLIZZARD', 'THUNDER', 'HURRICANE', 'ISOBAR', 'TORNADO', 'PRECIPITATION'],
+      ['ZYKLON', 'FEUCHTIGKEIT', 'DRUCK', 'VORHERSAGE', 'MONSUN', 'DUERRE', 'SCHNEESTURM', 'DONNER', 'HURRIKAN', 'ISOBARE', 'TORNADO', 'NIEDERSCHLAG'],
+      ['CYCLONE', 'HUMIDITE', 'PRESSION', 'PREVISION', 'MOUSSON', 'SECHERESSE', 'BLIZZARD', 'TONNERRE', 'OURAGAN', 'ISOBARE', 'TORNADE', 'PRECIPITATION'],
+      ['CICLON', 'HUMEDAD', 'PRESION', 'PRONOSTICO', 'MONZON', 'SEQUIA', 'VENTISCA', 'TRUENO', 'HURACAN', 'ISOBARA', 'TORNADO', 'PRECIPITACION'],
+      ['CICLONE', 'UMIDITA', 'PRESSIONE', 'PREVISIONE', 'MONSONE', 'SICCITA', 'BUFERA', 'TUONO', 'URAGANO', 'ISOBARA', 'TORNADO', 'PRECIPITAZIONE']),
+    T(['Cinema Terms', 'Filmbegriffe', 'Termes Cinema', 'Terminos Cine', 'Termini Cinema'],
+      ['MONTAGE', 'CLOSEUP', 'FLASHBACK', 'SOUNDTRACK', 'STORYBOARD', 'SEQUENCE', 'CINEMATOGRAPHY', 'DISSOLVE', 'PANNING', 'SCREENPLAY', 'CAMEO', 'FRAMING'],
+      ['MONTAGE', 'NAHAUFNAHME', 'RUECKBLENDE', 'FILMMUSIK', 'STORYBOARD', 'SEQUENZ', 'KAMERAFUEHRUNG', 'UEBERBLENDUNG', 'SCHWENK', 'DREHBUCH', 'CAMEO', 'BILDAUSSCHNITT'],
+      ['MONTAGE', 'GROSPLAN', 'FLASHBACK', 'BANDESON', 'STORYBOARD', 'SEQUENCE', 'CINEMATOGRAPHIE', 'FONDU', 'PANORAMIQUE', 'SCENARIO', 'CAMEO', 'CADRAGE'],
+      ['MONTAJE', 'PRIMERPLANO', 'FLASHBACK', 'BANDASONORA', 'GUIONGRAFICO', 'SECUENCIA', 'CINEMATOGRAFIA', 'FUNDIDO', 'PANORAMICA', 'GUION', 'CAMEO', 'ENCUADRE'],
+      ['MONTAGGIO', 'PRIMOPIANO', 'FLASHBACK', 'COLONNASONORA', 'STORYBOARD', 'SEQUENZA', 'CINEMATOGRAFIA', 'DISSOLVENZA', 'PANORAMICA', 'SCENEGGIATURA', 'CAMEO', 'INQUADRATURA']),
+  ],
+};
+
+var LANGS = [
+  {key: 'en', label: 'EN'},
+  {key: 'de', label: 'DE'},
+  {key: 'fr', label: 'FR'},
+  {key: 'es', label: 'ES'},
+  {key: 'it', label: 'IT'},
+];
+
+// Accent / special-letter fold to A–Z.
+var FOLD = {
+  'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'AE', 'Å': 'A',
+  'Ç': 'C', 'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E',
+  'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I', 'Ñ': 'N',
+  'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'OE',
+  'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'UE', 'Ý': 'Y', 'ß': 'SS', 'Œ': 'OE', 'Æ': 'AE',
+};
+function normalize(w) {
+  var up = w.toUpperCase(), out = '';
+  for (var i = 0; i < up.length; i++) {
+    var ch = up[i];
+    if (FOLD[ch]) out += FOLD[ch];
+    else if (ch >= 'A' && ch <= 'Z') out += ch;
+    // anything else (spaces, hyphens) dropped
+  }
+  return out;
+}
+
+function randInt(rng, n) { return (rng() * n) | 0; }
+function shuffle(arr, rng) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = randInt(rng, i + 1), t = arr[i];
+    arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+// Try to place `word` on the grid; returns cell index list or null.
+function tryPlace(grid, size, word, dirs, rng) {
+  for (var attempt = 0; attempt < 150; attempt++) {
+    var dir = DIRS[dirs[randInt(rng, dirs.length)]];
+    var dr = dir[0], dc = dir[1];
+    // starting cell such that the whole word stays in bounds
+    var r0lo = dr < 0 ? (word.length - 1) : 0;
+    var r0hi = dr > 0 ? (size - word.length) : (size - 1);
+    var c0lo = dc < 0 ? (word.length - 1) : 0;
+    var c0hi = dc > 0 ? (size - word.length) : (size - 1);
+    if (r0hi < r0lo || c0hi < c0lo) continue;
+    var r = r0lo + randInt(rng, r0hi - r0lo + 1);
+    var c = c0lo + randInt(rng, c0hi - c0lo + 1);
+    var cells = [], ok = true;
+    for (var k = 0; k < word.length; k++) {
+      var rr = r + dr * k, cc = c + dc * k, idx = rr * size + cc;
+      var cur = grid[idx];
+      if (cur !== '' && cur !== word[k]) { ok = false; break; }
+      cells.push(idx);
+    }
+    if (!ok) continue;
+    for (var k2 = 0; k2 < word.length; k2++) grid[cells[k2]] = word[k2];
+    return cells;
+  }
+  return null;
+}
+
+/**
+ * Build a puzzle. tier ∈ easy|medium|hard, lang ∈ en|de|fr|es|it.
+ * Returns {size, tier, theme, lang, grid: string[size*size],
+ *          words: [{text, cells:number[], found:false}]}.
+ */
+function generate(tier, lang, rng) {
+  rng = rng || Math.random;
+  var cfg = TIERS[tier] || TIERS.easy;
+  var pool = THEMES[tier] || THEMES.easy;
+  var theme = pool[randInt(rng, pool.length)];
+  var size = cfg.size;
+
+  // candidate words: normalise, fit to grid, unique, shuffle, cap to count
+  var seen = {}, cands = [];
+  var raw = theme.words[lang] || theme.words.en;
+  for (var i = 0; i < raw.length; i++) {
+    var w = normalize(raw[i]);
+    if (w.length >= 3 && w.length <= size && !seen[w]) { seen[w] = 1; cands.push(w); }
+  }
+  shuffle(cands, rng);                 // random pick order for variety…
+  cands.sort(function (a, b) { return b.length - a.length; }); // …then seat longest first (fits an empty grid)
+
+  var grid = new Array(size * size).fill('');
+  var words = [];
+  for (var j = 0; j < cands.length && words.length < cfg.count; j++) {
+    var cells = tryPlace(grid, size, cands[j], cfg.dirs, rng);
+    if (cells) words.push({text: cands[j], cells: cells, found: false});
+  }
+  // fill blanks
+  for (var g = 0; g < grid.length; g++) if (grid[g] === '') grid[g] = ALPHABET[randInt(rng, 26)];
+
+  return {size: size, tier: tier, theme: theme.name[lang] || theme.name.en, lang: lang, grid: grid, words: words};
+}
+
+/**
+ * Given a straight selection from cell a to cell b (inclusive), return the
+ * list of cell indices if a→b is a valid line (row / col / diagonal), else null.
+ */
+function lineCells(size, a, b) {
+  var ar = (a / size) | 0, ac = a % size, br = (b / size) | 0, bc = b % size;
+  var dr = br - ar, dc = bc - ac;
+  var adr = Math.abs(dr), adc = Math.abs(dc);
+  if (!(dr === 0 || dc === 0 || adr === adc)) return null; // not aligned
+  var len = Math.max(adr, adc) + 1;
+  var sr = dr === 0 ? 0 : dr / adr, sc = dc === 0 ? 0 : dc / adc;
+  var cells = [];
+  for (var k = 0; k < len; k++) cells.push((ar + sr * k) * size + (ac + sc * k));
+  return cells;
+}
+
+module.exports = {
+  TIERS: TIERS, THEMES: THEMES, LANGS: LANGS, DIRS: DIRS,
+  normalize: normalize, generate: generate, lineCells: lineCells,
+};

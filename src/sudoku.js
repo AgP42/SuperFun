@@ -42,11 +42,6 @@ function bitToDigit(bit) {
   return 31 - Math.clz32(bit);
 }
 
-function boxOf(i) {
-  var r = (i / 9) | 0, c = i % 9;
-  return ((r / 3) | 0) * 3 + ((c / 3) | 0);
-}
-
 // Fisher–Yates, using the provided rng (defaults to Math.random)
 function shuffle(arr, rng) {
   rng = rng || Math.random;
@@ -213,5 +208,4 @@ module.exports = {
   digHoles: digHoles,
   countSolutions: countSolutions,
   popcount: popcount,
-  boxOf: boxOf,
 };

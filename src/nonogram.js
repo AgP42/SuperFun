@@ -123,10 +123,17 @@ function cluesFor(sol, size) {
   return {rowClues: rowClues, colClues: colClues};
 }
 
-function generate(size, rng) {
+// `avoid` = list of picture names already discovered for this size; we draw from
+// the not-yet-found ones until they run out, then fall back to the full bank.
+function generate(size, rng, avoid) {
   rng = rng || Math.random;
   var bank = PICTURES[size] || PICTURES[8];
-  var pic = bank[Math.floor(rng() * bank.length)];
+  var pool = bank;
+  if (avoid && avoid.length) {
+    var remaining = bank.filter(function (p) { return avoid.indexOf(p.name) === -1; });
+    if (remaining.length) pool = remaining;
+  }
+  var pic = pool[Math.floor(rng() * pool.length)];
   var sol = pictureToSolution(pic.rows, size);
   var cl = cluesFor(sol, size);
   return {size: size, solution: sol, rowClues: cl.rowClues, colClues: cl.colClues, name: pic.name};
