@@ -93,6 +93,11 @@ there’s nothing to memorise.
   `MyStyle/Plugins/SuperFun/`.
 - **Family play** — pick 2–4 players, give each a **name and an emoji** (taken
   emojis grey out), with a big “whose turn” indicator.
+- **Records &amp; badges** — a 🏆 **Records** page tracks every result: total games
+  played, your **top‑3 personal bests** for each solo puzzle (per difficulty), a
+  **Nonogram picture gallery** that fills in as you solve, minefield/word‑search
+  tallies, and unlockable **achievement badges**. Optionally show your best score
+  right inside each game.
 - **Built for e‑ink** — high‑contrast B/W, large tap targets, no animation, and a
   layout where the board never jumps around while you play.
 - **Offline &amp; private** — no account, no network, nothing leaves your device.
