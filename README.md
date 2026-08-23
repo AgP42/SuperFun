@@ -102,6 +102,11 @@ there’s nothing to memorise.
   layout where the board never jumps around while you play.
 - **Offline &amp; private** — no account, no network, nothing leaves your device.
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/records.png" alt="SuperFun Records page — personal bests, Nonogram gallery, tallies and badges" width="380">
+  <br><em>The 🏆 Records page — personal bests, a Nonogram picture gallery, tallies and badges.</em>
+</div>
+
 ## Install (on the device)
 
 1. Copy `superfun-<version>.snplg` to the **`MyStyle/`** folder on your Supernote
