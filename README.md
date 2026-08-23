@@ -8,7 +8,12 @@ Turn your Supernote e‑ink tablet into a little games console — around **20 g
 in one plugin. Pure black &amp; white, finger‑first, no account, no network:
 everything is generated and played right on the device.
 
-<img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/home.png" alt="SuperFun home — game launcher" width="380">
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/home-solo.png" alt="SuperFun — Solo games" width="360"></td>
+    <td><img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/home-multi.png" alt="SuperFun — Multiplayer, with player names &amp; emojis" width="360"></td>
+  </tr>
+</table>
 
 </div>
 
