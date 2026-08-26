@@ -1,6 +1,6 @@
 {
   "name": "superfun",
-  "version": "0.28.7",
+  "version": "1.0.1",
   "description": "SuperFun — little games for your Supernote (Sudoku, Tic-Tac-Toe…)",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
   "dependencies": {
     "react": "19.0.0",
     "react-native": "0.79.2",
-    "sn-plugin-lib": "^0.1.19"
+    "sn-plugin-lib": "^0.1.65"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -1,24 +1,40 @@
 /**
- * SuperFun — persistent save bridge (JSON in MyStyle/Plugins/SuperFun/).
- * Backed by the native FileStore module; degrades to no-op if absent.
+ * SuperFun — persistent save bridge.
+ *
+ * Chauvet firmware enforces FILE:READ/WRITE permissions even on raw java.io
+ * access to shared storage (MyStyle/…), so writing saves there would either
+ * throw a SecurityException (silently losing saves) or require a permission
+ * prompt. Instead we keep everything in the plugin's PRIVATE directory
+ * (PluginManager.getPluginDirPath() → /data/.../plugins/<pluginID>), which is
+ * permission-free and stable across version upgrades. Raw java.io writes there
+ * are the app's own data dir, so the native FileStore bridge needs no changes.
+ * Falls back to no-op if the bridge or the path is unavailable.
  */
 import {NativeModules} from 'react-native';
+import {PluginManager} from 'sn-plugin-lib';
 
 const FS: any = NativeModules.FileStore;
 export const hasFileStore = !!FS;
 
-const REL = '/MyStyle/Plugins/SuperFun/saves.json';
-const STATS_REL = '/MyStyle/Plugins/SuperFun/stats.json';
+const SAVES_REL = '/saves.json';
+const STATS_REL = '/stats.json';
 let baseCache: string | null = null;
 
 async function base(): Promise<string | null> {
   if (!FS) return null;
-  if (!baseCache) baseCache = await FS.getExternalDir();
+  if (!baseCache) {
+    try {
+      const dir = await PluginManager.getPluginDirPath();
+      baseCache = dir || null;
+    } catch (e) {
+      baseCache = null;
+    }
+  }
   return baseCache;
 }
 async function savesPath(): Promise<string | null> {
   const b = await base();
-  return b ? b + REL : null;
+  return b ? b + SAVES_REL : null;
 }
 
 // --- persistent stats (records, gallery, badges, prefs) ---------------------

@@ -89,8 +89,8 @@ there’s nothing to memorise.
 - **Real opponents** — the duel games use a proper game‑tree search (minimax /
   alpha‑beta / MCTS). Easy plays loose, Hard plays sharp.
 - **Auto‑resume + manual saves** — close mid‑game and it’s right there when you
-  reopen it; every game also keeps up to 10 manual saves, stored as JSON in
-  `MyStyle/Plugins/SuperFun/`.
+  reopen it; every game also keeps up to 10 manual saves, persisted as JSON in
+  the plugin's private storage (kept across sessions, no permission prompt).
 - **Family play** — pick 2–4 players, give each a **name and an emoji** (taken
   emojis grey out), with a big “whose turn” indicator.
 - **Records &amp; badges** — a 🏆 **Records** page tracks every result: total games
@@ -106,6 +106,23 @@ there’s nothing to memorise.
   <img src="https://raw.githubusercontent.com/AgP42/SuperFun/main/docs/screenshots/records.png" alt="SuperFun Records page — personal bests, Nonogram gallery, tallies and badges" width="380">
   <br><em>The 🏆 Records page — personal bests, a Nonogram picture gallery, tallies and badges.</em>
 </div>
+
+## Which version do I need? (Supernote firmware)
+
+In August 2026 Supernote shipped a **plugin-preview firmware** (Chauvet
+`3.29.43` for Manta / Nomad, `2.26.40` for A5 X / A6 X) that introduces a new
+plugin **permission system** and other breaking plugin-API changes. A build
+made for one firmware does **not** run on the other — so download the release
+that matches your device:
+
+| Your firmware | Download | Notes |
+|---|---|---|
+| **Stable / older** — you never flashed the developer plugin-preview build | **[v0.28.7](../../releases/tag/v0.28.7)** | The classic build. This is what almost everyone should use. |
+| **Plugin-preview (Chauvet)** — you flashed the developer plugin-preview firmware | **[v1.0.1](../../releases/tag/v1.0.1)** | Rebuilt for `sn-plugin-lib` 0.1.65. Same games; saves now live in the plugin's private storage, so the new firmware never prompts for a file permission. |
+
+**Not sure which you have?** If you never deliberately installed a "plugin
+preview / developer" firmware, you are on stable → use **v0.28.7**. Installing
+the wrong build shows *"package not compatible"* or the plugin does nothing.
 
 ## Install (on the device)
 
@@ -132,6 +149,10 @@ export ANDROID_HOME=/path/to/android-sdk
 `buildPlugin.sh` bundles the JS, compiles the native module and packages the
 `.snplg`. (`./bump-and-build.sh` does the same but auto-increments the version and
 names the file `superfun-<version>.snplg`.)
+
+The `main` branch targets the **plugin-preview (Chauvet) firmware**
+(`sn-plugin-lib` 0.1.65). To build the **stable-firmware** version instead,
+check out the `v0.28.7` tag first.
 
 ## Under the hood
 
