@@ -109,20 +109,23 @@ there’s nothing to memorise.
 
 ## Which version do I need? (Supernote firmware)
 
-In August 2026 Supernote shipped a **plugin-preview firmware** (Chauvet
-`3.29.43` for Manta / Nomad, `2.26.40` for A5 X / A6 X) that introduces a new
-plugin **permission system** and other breaking plugin-API changes. A build
-made for one firmware does **not** run on the other — so download the release
-that matches your device:
+In August 2026 Supernote began rolling out a new **plugin firmware** (Chauvet
+`3.29.43` for Manta / Nomad, `2.26.40` for A5 X / A6 X) — a developer preview
+today, expected to reach everyone soon. It adds a plugin **permission system**
+and other breaking plugin-API changes, so a build made for one firmware does
+**not** run on the other. Pick the release that matches the firmware currently
+on your device:
 
-| Your firmware | Download | Notes |
-|---|---|---|
-| **Stable / older** — you never flashed the developer plugin-preview build | **[v0.28.7](../../releases/tag/v0.28.7)** | The classic build. This is what almost everyone should use. |
-| **Plugin-preview (Chauvet)** — you flashed the developer plugin-preview firmware | **[v1.0.1](../../releases/tag/v1.0.1)** | Rebuilt for `sn-plugin-lib` 0.1.65. Same games; saves now live in the plugin's private storage, so the new firmware never prompts for a file permission. |
+| Your device's firmware | Download |
+|---|---|
+| Not (yet) on the Chauvet plugin firmware | **[v0.28.7](../../releases/tag/v0.28.7)** |
+| Chauvet plugin firmware — `3.29.43` (Manta/Nomad) · `2.26.40` (A5 X / A6 X) | **[v1.0.1](../../releases/tag/v1.0.1)** |
 
-**Not sure which you have?** If you never deliberately installed a "plugin
-preview / developer" firmware, you are on stable → use **v0.28.7**. Installing
-the wrong build shows *"package not compatible"* or the plugin does nothing.
+Both builds carry the same games. **v1.0.1** is rebuilt for `sn-plugin-lib`
+0.1.65 and keeps its saves in the plugin's private storage (no file-permission
+prompt); once the Chauvet firmware ships publicly it becomes the main build.
+Installing the wrong build shows *"package not compatible"* or the plugin does
+nothing.
 
 ## Install (on the device)
 
