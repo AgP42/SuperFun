@@ -21,7 +21,7 @@ var BEST = {
 
 var STATS_VER = 2; // bump when a record's meaning changes (needs migration)
 
-function emptyStats() { return {best: {}, gallery: [], counters: {}, showBest: true, names: {}, emojis: {}, ver: STATS_VER}; }
+function emptyStats() { return {best: {}, gallery: [], counters: {}, showBest: true, names: {}, emojis: {}, lang: '', ver: STATS_VER}; }
 function normalize(s) {
   s = s || {};
   var out = {
@@ -31,6 +31,7 @@ function normalize(s) {
     showBest: s.showBest !== false,
     names: s.names && typeof s.names === 'object' ? s.names : {},
     emojis: s.emojis && typeof s.emojis === 'object' ? s.emojis : {},
+    lang: typeof s.lang === 'string' ? s.lang : '', // '' = follow the device locale
     ver: s.ver || 0,
   };
   // v2: the 2048 record switched from SCORE to HIGHEST TILE — drop legacy score entries once.

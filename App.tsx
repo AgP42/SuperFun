@@ -49,6 +49,7 @@ import * as SHIP from './src/battleship';
 import * as CHESS from './src/chess';
 import {loadSaves, persistSaves, loadStats, persistStats} from './src/filestore';
 import * as STATS from './src/stats';
+import {tr, setLang, getLang, LANGS} from './src/i18n';
 
 const NONO_TOTAL = (Object.keys(NONO.PICTURES) as string[]).reduce((a, k) => a + (NONO.PICTURES as any)[k].length, 0);
 
@@ -208,7 +209,7 @@ const MINE_LOSE = [
   'Boom! 💥 That was a mine', 'Ka-boom — try again 💣', 'One wrong tap… 😬', 'The mine got you 💥',
   'So close to safe 💪', 'Defused zero, exploded one 😅', 'Mind the mines next time 🔁', 'That one was trouble 💥',
 ];
-const pick = (pool: string[], i: number) => pool[i % pool.length];
+const pick = (pool: string[], i: number) => tr(pool[i % pool.length]);
 
 const RULES: Record<GameKey, {title: string; lines: string[]}> = {
   ttt: {
@@ -470,7 +471,9 @@ function App(): React.JSX.Element {
     pictures: stats.gallery as string[],
     counter: (key: string) => mutateStats(s => STATS.bumpCounter(s, key)),
   };
-  const resetStats = () => mutateStats(() => STATS.emptyStats());
+  const resetStats = () => mutateStats(s => ({...STATS.emptyStats(), lang: s.lang}));
+  setLang(stats.lang); // before any child renders, so every tr() sees the current language
+  const cycleLang = () => mutateStats(s => ({...s, lang: LANGS[(LANGS.indexOf(getLang()) + 1) % LANGS.length]}));
 
   // Update state AND persist. Same (game,key) updates in place; new one is
   // prepended; each game keeps at most 10 (oldest dropped).
@@ -506,7 +509,7 @@ function App(): React.JSX.Element {
 
   // Remembered player names (persisted in stats.json), survive game switches and sessions.
   const nm = stats.names || {};
-  const resolvedNames: Names = {p1: nm.p1 || 'Player 1', p2: nm.p2 || 'Player 2', p3: nm.p3 || 'Player 3', p4: nm.p4 || 'Player 4'};
+  const resolvedNames: Names = {p1: nm.p1 || tr('Player {n}', {n: 1}), p2: nm.p2 || tr('Player {n}', {n: 2}), p3: nm.p3 || tr('Player {n}', {n: 3}), p4: nm.p4 || tr('Player {n}', {n: 4})};
   const saveNames = (n: Names) => mutateStats(s => ({...s, names: n}));
   const em = stats.emojis || {};
   const resolvedEmojis: Names = {p1: em.p1 || '', p2: em.p2 || '', p3: em.p3 || '', p4: em.p4 || ''};
@@ -566,7 +569,7 @@ function App(): React.JSX.Element {
     case 'records':
       return <Records stats={stats} onMenu={home} onToggle={() => mutateStats(s => STATS.setShowBest(s, !s.showBest))} onReset={resetStats} />;
     default:
-      return <Home onPlay={play} onRecords={() => setScreen({name: 'records'})} initialNames={resolvedNames} onNames={saveNames} initialEmojis={resolvedEmojis} onEmojis={saveEmojis} />;
+      return <Home onPlay={play} onRecords={() => setScreen({name: 'records'})} initialNames={resolvedNames} onNames={saveNames} initialEmojis={resolvedEmojis} onEmojis={saveEmojis} onLang={cycleLang} />;
   }
 }
 
@@ -587,7 +590,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         {row([exCell(<Text style={s.exGiven}>5</Text>, 0), exCell(null, 1), exCell(<Text style={s.exGiven}>3</Text>, 2)], 0)}
         {row([exCell(null, 0), exCell(<Text style={s.exHand}>7</Text>, 1), exCell(null, 2)], 1)}
         {row([exCell(<Text style={s.exGiven}>1</Text>, 0), exCell(notes, 1), exCell(null, 2)], 2)}
-        <Text style={s.exCaption}>Bold = clue · handwriting = your answer · small = notes</Text>
+        <Text style={s.exCaption}>{tr('Bold = clue · handwriting = your answer · small = notes')}</Text>
       </View>
     );
   }
@@ -599,7 +602,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[exCell(O(true), 0, true), exCell(X, 1), exCell(null, 2)]}</View>
         <View style={s.exGridRow}>{[exCell(O(true), 0, true), exCell(X, 1), exCell(null, 2)]}</View>
         <View style={s.exGridRow}>{[exCell(O(true), 0, true), exCell(null, 1), exCell(null, 2)]}</View>
-        <Text style={s.exCaption}>Three in a row — you win</Text>
+        <Text style={s.exCaption}>{tr('Three in a row — you win')}</Text>
       </View>
     );
   }
@@ -611,7 +614,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[exCell(null, 0), exCell(null, 1), exCell(null, 2), exCell(null, 3)]}</View>
         <View style={s.exGridRow}>{[exCell(X, 0), exCell(null, 1), exCell(X, 2), exCell(null, 3)]}</View>
         <View style={s.exGridRow}>{[exCell(O(true), 0, true), exCell(O(true), 1, true), exCell(O(true), 2, true), exCell(O(true), 3, true)]}</View>
-        <Text style={s.exCaption}>Four in a row — you win</Text>
+        <Text style={s.exCaption}>{tr('Four in a row — you win')}</Text>
       </View>
     );
   }
@@ -624,7 +627,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[exCell(mine, 0, true), exCell(flag, 1), exCell(null, 2)]}</View>
         <View style={s.exGridRow}>{[exCell(null, 0), exCell(two, 1), exCell(null, 2)]}</View>
         <View style={s.exGridRow}>{[exCell(null, 0), exCell(null, 1), exCell(mine, 2, true)]}</View>
-        <Text style={s.exCaption}>"2" = two mines nearby · ⚑ = your flag</Text>
+        <Text style={s.exCaption}>{tr('"2" = two mines nearby · ⚑ = your flag')}</Text>
       </View>
     );
   }
@@ -637,7 +640,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
           <Text style={s.exClueLabel}>2 1</Text>
           {[f(0), f(1), e(2), f(3)]}
         </View>
-        <Text style={s.exCaption}>Clue "2 1" → a run of 2, a gap, then 1</Text>
+        <Text style={s.exCaption}>{tr('Clue "2 1" → a run of 2, a gap, then 1')}</Text>
       </View>
     );
   }
@@ -648,11 +651,11 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={[s.exGridRow, {alignItems: 'center'}]}>{tile(2, 0)}{tile(2, 1)}<Text style={s.exArrowT}> → </Text>{tile(4, 3)}</View>
-        <Text style={s.exCaption}>An arrow slides EVERY tile that way; two equal tiles that bump merge (2 + 2 = 4).</Text>
+        <Text style={s.exCaption}>{tr('An arrow slides EVERY tile that way; two equal tiles that bump merge (2 + 2 = 4).')}</Text>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center', marginTop: 8, maxWidth: 250}}>
           {ladder.map((n, i) => step(n, i))}
         </View>
-        <Text style={s.exCaption}>Tiles only DOUBLE — there is no "1". Keep merging up this ladder to reach the 1024 tile.</Text>
+        <Text style={s.exCaption}>{tr('Tiles only DOUBLE — there is no "1". Keep merging up this ladder to reach the 1024 tile.')}</Text>
       </View>
     );
   }
@@ -664,7 +667,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[t('1', 0), t('2', 1), t('3', 2)]}</View>
         <View style={s.exGridRow}>{[t('4', 0), t('5', 1), t('6', 2)]}</View>
         <View style={s.exGridRow}>{[t('7', 0), gap(1), t('8', 2)]}</View>
-        <Text style={s.exCaption}>Tap the 8 (next to the gap) to slide it in — work the numbers back into order.</Text>
+        <Text style={s.exCaption}>{tr('Tap the 8 (next to the gap) to slide it in — work the numbers back into order.')}</Text>
       </View>
     );
   }
@@ -678,7 +681,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
           {peg(3, 0)}{peg(1, 1)}{peg(4, 2)}{peg(2, 3)}
           <View style={{flexDirection: 'row', marginLeft: 10, alignItems: 'center'}}>{black(0)}{black(1)}{white(2)}</View>
         </View>
-        <Text style={s.exCaption}>Your row of numbers, then the feedback in a line: ● = right number in the right spot · ○ = right number, wrong spot (here 2 black + 1 white).</Text>
+        <Text style={s.exCaption}>{tr('Your row of numbers, then the feedback in a line: ● = right number in the right spot · ○ = right number, wrong spot (here 2 black + 1 white).')}</Text>
       </View>
     );
   }
@@ -691,7 +694,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
           <Text style={s.exArrowT}> → </Text>
           {hole(3, false)}{hole(4, false)}{hole(5, true)}
         </View>
-        <Text style={s.exCaption}>Jump a peg over its neighbour into the empty hole — the jumped peg is removed.</Text>
+        <Text style={s.exCaption}>{tr('Jump a peg over its neighbour into the empty hole — the jumped peg is removed.')}</Text>
       </View>
     );
   }
@@ -700,7 +703,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={s.exGridRow}>{[card('7', 0), card('7', 1), card('?', 2, true), card('?', 3, true)]}</View>
-        <Text style={s.exCaption}>Flip two cards; a matching pair (7 &amp; 7) stays up and you play again.</Text>
+        <Text style={s.exCaption}>{tr('Flip two cards; a matching pair (7 & 7) stays up and you play again.')}</Text>
       </View>
     );
   }
@@ -713,7 +716,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[c(O, 0), c(null, 1, true), c(null, 2)]}</View>
         <View style={s.exGridRow}>{[c(null, 0), c(X, 1), c(null, 2)]}</View>
         <View style={s.exGridRow}>{[c(null, 0), c(null, 1), c(O, 2)]}</View>
-        <Text style={s.exCaption}>Nine small boards. Win one to claim its big square (O/X); the highlighted board is where you must play next.</Text>
+        <Text style={s.exCaption}>{tr('Nine small boards. Win one to claim its big square (O/X); the highlighted board is where you must play next.')}</Text>
       </View>
     );
   }
@@ -724,7 +727,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
         <View style={s.exGridRow}>{[L('C', 0, true), L('X', 1), L('T', 2)]}</View>
         <View style={s.exGridRow}>{[L('R', 0), L('A', 1, true), L('E', 2)]}</View>
         <View style={s.exGridRow}>{[L('B', 0), L('S', 1), L('T', 2, true)]}</View>
-        <Text style={s.exCaption}>Tap the first letter, then the last letter of a hidden word (CAT on the diagonal).</Text>
+        <Text style={s.exCaption}>{tr('Tap the first letter, then the last letter of a hidden word (CAT on the diagonal).')}</Text>
       </View>
     );
   }
@@ -733,7 +736,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={s.exGridRow}>{[disc(0, 1), disc(1, 2), disc(2, 2), <View key={3} style={s.exCell}><View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: '#999'}} /></View>]}</View>
-        <Text style={s.exCaption}>Play your ● on the dot so the ○ ○ line is trapped between your discs — they flip to ●.</Text>
+        <Text style={s.exCaption}>{tr('Play your ● on the dot so the ○ ○ line is trapped between your discs — they flip to ●.')}</Text>
       </View>
     );
   }
@@ -742,7 +745,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={[s.exGridRow, {alignItems: 'center'}]}>{sq(0, 1)}{sq(1, 2)}{sq(2, 0)}<Text style={s.exArrowT}> → </Text>{sq(3, 0)}{sq(4, 0)}{sq(5, 1)}</View>
-        <Text style={s.exCaption}>{game === 'dames' ? 'Jump the ○ into the empty square beyond (10×10, kings fly, take the most).' : 'Jump the ○ into the empty square beyond it to capture — captures are compulsory.'}</Text>
+        <Text style={s.exCaption}>{game === 'dames' ? tr('Jump the ○ into the empty square beyond (10×10, kings fly, take the most).') : tr('Jump the ○ into the empty square beyond it to capture — captures are compulsory.')}</Text>
       </View>
     );
   }
@@ -754,7 +757,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
           <Text style={s.exArrowT}>→</Text>
           <View style={{width: 40, height: 40, borderWidth: 2, borderColor: INK, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECECEC'}}><Text style={s.exNum}>L</Text></View>
         </View>
-        <Text style={s.exCaption}>Draw the missing 4th side to close the box — it becomes yours and you go again.</Text>
+        <Text style={s.exCaption}>{tr('Draw the missing 4th side to close the box — it becomes yours and you go again.')}</Text>
       </View>
     );
   }
@@ -762,7 +765,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}><DieFace n={1} size={40} /><Text style={s.exArrowT}>✗</Text></View>
-        <Text style={s.exCaption}>Roll to gather points, but a 1 wipes the turn's total. Tap Hold to bank it and pass on.</Text>
+        <Text style={s.exCaption}>{tr('Roll to gather points, but a 1 wipes the turn\'s total. Tap Hold to bank it and pass on.')}</Text>
       </View>
     );
   }
@@ -770,7 +773,7 @@ function RulesExample({game}: {game: GameKey}): React.JSX.Element | null {
     return (
       <View style={s.exWrap}>
         <View style={s.exGridRow}>{[exCell(<Text style={s.exNum}>↑</Text>, 0), exCell(<Text style={s.exNum}>·</Text>, 1), exCell(<Text style={s.exNum}>↓</Text>, 2)]}</View>
-        <Text style={s.exCaption}>Roll &amp; move: a ladder (↑) climbs you up, a snake (↓) slides you down. Land exactly on 100 to win.</Text>
+        <Text style={s.exCaption}>{tr('Roll & move: a ladder (↑) climbs you up, a snake (↓) slides you down. Land exactly on 100 to win.')}</Text>
       </View>
     );
   }
@@ -788,31 +791,31 @@ function SavedModal({saves, onLoad, onDelete, onClose}: {
         {resume ? (
           <View style={[s.savedRow, s.resumeRow]}>
             <View style={{flex: 1}}>
-              <Text style={s.savedText}>{resume.label}</Text>
-              <Text style={s.savedSub}>left off {fmtTs(resume.ts)}</Text>
+              <Text style={s.savedText}>{resume.label.replace('▶ Resume — ', '▶ ' + tr('Resume') + ' — ')}</Text>
+              <Text style={s.savedSub}>{tr('left off {ts}', {ts: fmtTs(resume.ts)})}</Text>
             </View>
-            <Pressable style={[s.savedBtn, s.resumeBtn]} onPress={() => onLoad(resume)}><Text style={[s.savedBtnText, s.solidText]}>Continue</Text></Pressable>
-            <Pressable style={s.savedBtn} onPress={() => onDelete(resume.key)}><Text style={s.savedBtnText}>Delete</Text></Pressable>
+            <Pressable style={[s.savedBtn, s.resumeBtn]} onPress={() => onLoad(resume)}><Text style={[s.savedBtnText, s.solidText]}>{tr('Continue')}</Text></Pressable>
+            <Pressable style={s.savedBtn} onPress={() => onDelete(resume.key)}><Text style={s.savedBtnText}>{tr('Delete')}</Text></Pressable>
           </View>
         ) : null}
-        <Text style={s.modalTitle}>Saved ({manual.length}/10)</Text>
+        <Text style={s.modalTitle}>{tr('Saved ({n}/10)', {n: manual.length})}</Text>
         {manual.length === 0 ? (
-          <Text style={s.savedEmpty}>No manual saves yet. Tap Save during a game — a game in progress is also kept above when you leave.</Text>
+          <Text style={s.savedEmpty}>{tr('No manual saves yet. Tap Save during a game — a game in progress is also kept above when you leave.')}</Text>
         ) : (
           <ScrollView style={{maxHeight: 300}}>
             {manual.map(sv => (
               <View key={sv.key} style={s.savedRow}>
                 <View style={{flex: 1}}>
                   <Text style={s.savedText}>{sv.label} · #{sv.key}</Text>
-                  <Text style={s.savedSub}>saved {fmtTs(sv.ts)}</Text>
+                  <Text style={s.savedSub}>{tr('saved {ts}', {ts: fmtTs(sv.ts)})}</Text>
                 </View>
-                <Pressable style={s.savedBtn} onPress={() => onLoad(sv)}><Text style={s.savedBtnText}>Load</Text></Pressable>
-                <Pressable style={s.savedBtn} onPress={() => onDelete(sv.key)}><Text style={s.savedBtnText}>Delete</Text></Pressable>
+                <Pressable style={s.savedBtn} onPress={() => onLoad(sv)}><Text style={s.savedBtnText}>{tr('Load')}</Text></Pressable>
+                <Pressable style={s.savedBtn} onPress={() => onDelete(sv.key)}><Text style={s.savedBtnText}>{tr('Delete')}</Text></Pressable>
               </View>
             ))}
           </ScrollView>
         )}
-        <Pressable style={s.modalBtn} onPress={onClose}><Text style={s.modalBtnText}>Close</Text></Pressable>
+        <Pressable style={s.modalBtn} onPress={onClose}><Text style={s.modalBtnText}>{tr('Close')}</Text></Pressable>
       </View>
     </View>
   );
@@ -832,15 +835,15 @@ function RulesModal({game, onClose}: {game: GameKey; onClose: () => void}): Reac
   return (
     <View style={s.modalWrap}>
       <View style={s.modalCard}>
-        <Text style={s.modalTitle}>How to play — {r.title}</Text>
+        <Text style={s.modalTitle}>{tr('How to play — {title}', {title: tr(r.title)})}</Text>
         {r.lines.map((l, i) => (
           <View key={i} style={s.ruleLine}>
             <Text style={s.ruleDot}>•</Text>
-            <Text style={s.ruleText}>{l}</Text>
+            <Text style={s.ruleText}>{tr(l)}</Text>
           </View>
         ))}
         <RulesExample game={game} />
-        <Pressable style={s.modalBtn} onPress={onClose}><Text style={s.modalBtnText}>Got it</Text></Pressable>
+        <Pressable style={s.modalBtn} onPress={onClose}><Text style={s.modalBtnText}>{tr('Got it')}</Text></Pressable>
       </View>
     </View>
   );
@@ -1159,14 +1162,14 @@ function GameHeader({title, onMenu, onUndo, onSave, savedCount, onShowSaved, onR
 }): React.JSX.Element {
   return (
     <View style={s.header}>
-      <Pressable style={s.iconBtn} onPress={async () => { await flushResume(); onMenu(); }}><Text style={s.iconText}>‹ Menu</Text></Pressable>
-      <Text style={s.gameTitle} numberOfLines={1}>{title}</Text>
+      <Pressable style={s.iconBtn} onPress={async () => { await flushResume(); onMenu(); }}><Text style={s.iconText}>{tr('‹ Menu')}</Text></Pressable>
+      <Text style={s.gameTitle} numberOfLines={1}>{tr(title)}</Text>
       <View style={{flexDirection: 'row'}}>
-        {onUndo ? <Pressable style={s.iconBtn} onPress={onUndo}><Text style={s.iconText}>↶ Undo</Text></Pressable> : null}
-        {onSave ? <Pressable style={s.iconBtn} onPress={onSave}><Text style={s.iconText}>Save</Text></Pressable> : null}
-        {onShowSaved ? <Pressable style={s.iconBtn} onPress={onShowSaved}><Text style={s.iconText}>Saved ({savedCount})</Text></Pressable> : null}
-        {onRules ? <Pressable style={s.iconBtn} onPress={onRules}><Text style={s.iconText}>Rules</Text></Pressable> : null}
-        {onNew ? <Pressable style={s.iconBtn} onPress={onNew}><Text style={s.iconText}>New</Text></Pressable> : null}
+        {onUndo ? <Pressable style={s.iconBtn} onPress={onUndo}><Text style={s.iconText}>{tr('↶ Undo')}</Text></Pressable> : null}
+        {onSave ? <Pressable style={s.iconBtn} onPress={onSave}><Text style={s.iconText}>{tr('Save')}</Text></Pressable> : null}
+        {onShowSaved ? <Pressable style={s.iconBtn} onPress={onShowSaved}><Text style={s.iconText}>{tr('Saved ({n})', {n: savedCount ?? 0})}</Text></Pressable> : null}
+        {onRules ? <Pressable style={s.iconBtn} onPress={onRules}><Text style={s.iconText}>{tr('Rules')}</Text></Pressable> : null}
+        {onNew ? <Pressable style={s.iconBtn} onPress={onNew}><Text style={s.iconText}>{tr('New')}</Text></Pressable> : null}
         <Pressable style={s.iconBtn} onPress={async () => { await flushResume(); PluginManager.closePluginView(); }}><Text style={s.iconText}>✕</Text></Pressable>
       </View>
     </View>
@@ -1174,7 +1177,7 @@ function GameHeader({title, onMenu, onUndo, onSave, savedCount, onShowSaved, onR
 }
 
 const EMOJI_CHOICES = ['🐱', '🐶', '🦊', '🐼', '🦁', '🐸', '🐧', '🐵', '⭐', '❤️', '⚡', '🚀'];
-function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis}: {onPlay: (g: GameKey, d: Diff, m: Mode, names: Names, emojis: Names, players?: number) => void; onRecords: () => void; initialNames: Names; onNames: (n: Names) => void; initialEmojis: Names; onEmojis: (e: Names) => void}): React.JSX.Element {
+function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis, onLang}: {onPlay: (g: GameKey, d: Diff, m: Mode, names: Names, emojis: Names, players?: number) => void; onRecords: () => void; onLang: () => void; initialNames: Names; onNames: (n: Names) => void; initialEmojis: Names; onEmojis: (e: Names) => void}): React.JSX.Element {
   const [tab, setTab] = useState<'solo' | 'multi'>('solo');
   const [sel, setSel] = useState<{game: GameKey; mode: Mode}>({game: 'sudoku', mode: 'ai'});
   const [diff, setDiff] = useState<Diff>('medium');
@@ -1194,7 +1197,7 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
   const order: Diff[] = ['easy', 'medium', 'hard'];
   const nameStates: Array<[string, (v: string) => void]> = [[p1, setP1], [p2, setP2], [p3, setP3], [p4, setP4]];
 
-  const collect = (): Names => ({p1: p1.trim() || 'Player 1', p2: p2.trim() || 'Player 2', p3: p3.trim() || 'Player 3', p4: p4.trim() || 'Player 4'});
+  const collect = (): Names => ({p1: p1.trim() || tr('Player {n}', {n: 1}), p2: p2.trim() || tr('Player {n}', {n: 2}), p3: p3.trim() || tr('Player {n}', {n: 3}), p4: p4.trim() || tr('Player {n}', {n: 4})});
   const collectEmojis = (): Names => ({p1: emojis[0] || '', p2: emojis[1] || '', p3: emojis[2] || '', p4: emojis[3] || ''});
   const pickEmoji = (i: number, e: string) => { const ne = emojis.slice(); ne[i] = ne[i] === e ? '' : e; setEmojis(ne); onEmojis({p1: ne[0] || '', p2: ne[1] || '', p3: ne[2] || '', p4: ne[3] || ''}); };
   const goTab = (t: 'solo' | 'multi') => { if (t === tab) return; setTab(t); setSel(t === 'solo' ? {game: 'sudoku', mode: 'ai'} : {game: 'ttt', mode: '2p'}); };
@@ -1224,8 +1227,8 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
       <Pressable onPress={() => setSel({game: g, mode})} style={[s.gTile, on && s.gTileOn]}>
         <GameIcon game={g} size={30} color={on ? PAPER : INK} />
         <View style={{flex: 1}}>
-          <Text style={[s.gTileName, on && s.solidText]}>{GAME_META[g].label}</Text>
-          <Text style={[s.gTileBlurb, on && s.solidTextDim]} numberOfLines={1}>{GAME_META[g].blurb}</Text>
+          <Text style={[s.gTileName, on && s.solidText]}>{tr(GAME_META[g].label)}</Text>
+          <Text style={[s.gTileBlurb, on && s.solidTextDim]} numberOfLines={1}>{tr(GAME_META[g].blurb)}</Text>
         </View>
       </Pressable>
     );
@@ -1242,27 +1245,28 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
           <Text style={s.brand}>SuperFun</Text>
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Pressable style={s.iconBtn} onPress={onRecords}><Text style={s.iconText}>🏆 Records</Text></Pressable>
+          <Pressable style={s.iconBtn} onPress={onLang}><Text style={s.iconText}>🌐 {getLang().toUpperCase()}</Text></Pressable>
+          <Pressable style={s.iconBtn} onPress={onRecords}><Text style={s.iconText}>{tr('🏆 Records')}</Text></Pressable>
           <Pressable style={s.iconBtn} onPress={() => PluginManager.closePluginView()}><Text style={s.iconText}>✕</Text></Pressable>
         </View>
       </View>
 
       <View style={s.tabs}>
-        <Pressable onPress={() => goTab('solo')} style={[s.tabBtn, tab === 'solo' && s.tabOn]}><Text style={[s.tabText, tab === 'solo' && s.solidText]}>Solo</Text></Pressable>
-        <Pressable onPress={() => goTab('multi')} style={[s.tabBtn, tab === 'multi' && s.tabOn]}><Text style={[s.tabText, tab === 'multi' && s.solidText]}>Multi-players</Text></Pressable>
+        <Pressable onPress={() => goTab('solo')} style={[s.tabBtn, tab === 'solo' && s.tabOn]}><Text style={[s.tabText, tab === 'solo' && s.solidText]}>{tr('Solo')}</Text></Pressable>
+        <Pressable onPress={() => goTab('multi')} style={[s.tabBtn, tab === 'multi' && s.tabOn]}><Text style={[s.tabText, tab === 'multi' && s.solidText]}>{tr('Multi-players')}</Text></Pressable>
       </View>
 
       <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom: 10}}>
         {tab === 'solo'
           ? SOLO_SECTIONS.map(sec => (
             <View key={sec.title}>
-              <Text style={s.sectionLabel}>{sec.title}</Text>
+              <Text style={s.sectionLabel}>{tr(sec.title)}</Text>
               <View style={s.tileGrid}>{sec.games.map(g => <Tile key={g} g={g} mode="ai" />)}</View>
             </View>
           ))
           : MULTI_SECTIONS.map(sec => (
             <View key={sec.title}>
-              <Text style={s.sectionLabel}>{sec.title}</Text>
+              <Text style={s.sectionLabel}>{tr(sec.title)}</Text>
               <View style={s.tileGrid}>{sec.games.map(g => <Tile key={g + sec.title} g={g} mode={sec.mode} />)}</View>
             </View>
           ))}
@@ -1272,15 +1276,15 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
       <View style={s.homeBottom}>
         {showDiff ? (
           <>
-            <Text style={s.sectionLabel}>Difficulty · {GAME_META[sel.game].label}</Text>
+            <Text style={s.sectionLabel}>{tr('Difficulty · {game}', {game: tr(GAME_META[sel.game].label)})}</Text>
             <View style={s.diffRow}>
               {order.map(d => (
                 <Pressable key={d} onPress={() => setDiff(d)} style={[s.diffBtn, diff === d && s.solidBtn]}>
-                  <Text style={[s.diffText, diff === d && s.solidText]}>{DIFFICULTIES[d].label}</Text>
+                  <Text style={[s.diffText, diff === d && s.solidText]}>{tr(DIFFICULTIES[d].label)}</Text>
                 </Pressable>
               ))}
             </View>
-            <Text style={s.diffHint}>{DIFF_HINT[sel.game]}</Text>
+            <Text style={s.diffHint}>{tr(DIFF_HINT[sel.game])}</Text>
           </>
         ) : null}
 
@@ -1288,7 +1292,7 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
           <>
             {sel.mode === 'multi' ? (
               <View style={s.memPlayers}>
-                <Text style={s.memPlayersLbl}>Players</Text>
+                <Text style={s.memPlayersLbl}>{tr('Players')}</Text>
                 {[2, 3, 4].map(n => (
                   <Pressable key={n} onPress={() => setMplayers(n)} style={[s.pSelBtn, mplayers === n && s.solidBtn]}>
                     <Text style={[s.pSelTxt, mplayers === n && s.solidText]}>{n}</Text>
@@ -1296,12 +1300,12 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
                 ))}
               </View>
             ) : null}
-            <Text style={s.sectionLabel}>Player names</Text>
+            <Text style={s.sectionLabel}>{tr('Player names')}</Text>
             <View style={s.nameRow}>
               {[0, 1].map(i => (
                 <View key={i} style={s.nameField}>
-                  <Text style={s.nameTag}>{sel.mode === '2p' ? (i === 0 ? 'First · plays O' : 'Second · plays X') : `Player ${i + 1}`}</Text>
-                  <TextInput value={nameStates[i][0]} onChangeText={nameStates[i][1]} onEndEditing={() => onNames(collect())} onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)} placeholder={`Player ${i + 1}`} placeholderTextColor="#AAAAAA" style={s.nameInput} maxLength={14} />
+                  <Text style={s.nameTag}>{sel.mode === '2p' ? (i === 0 ? tr('First · plays O') : tr('Second · plays X')) : tr('Player {n}', {n: i + 1})}</Text>
+                  <TextInput value={nameStates[i][0]} onChangeText={nameStates[i][1]} onEndEditing={() => onNames(collect())} onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)} placeholder={tr('Player {n}', {n: i + 1})} placeholderTextColor="#AAAAAA" style={s.nameInput} maxLength={14} />
                   <EmojiRow i={i} />
                 </View>
               ))}
@@ -1310,8 +1314,8 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
               <View style={[s.nameRow, {marginTop: 8}]}>
                 {[2, 3].filter(i => i < mplayers).map(i => (
                   <View key={i} style={s.nameField}>
-                    <Text style={s.nameTag}>Player {i + 1}</Text>
-                    <TextInput value={nameStates[i][0]} onChangeText={nameStates[i][1]} onEndEditing={() => onNames(collect())} onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)} placeholder={`Player ${i + 1}`} placeholderTextColor="#AAAAAA" style={s.nameInput} maxLength={14} />
+                    <Text style={s.nameTag}>{tr('Player {n}', {n: i + 1})}</Text>
+                    <TextInput value={nameStates[i][0]} onChangeText={nameStates[i][1]} onEndEditing={() => onNames(collect())} onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)} placeholder={tr('Player {n}', {n: i + 1})} placeholderTextColor="#AAAAAA" style={s.nameInput} maxLength={14} />
                   <EmojiRow i={i} />
                   </View>
                 ))}
@@ -1322,15 +1326,14 @@ function Home({onPlay, onRecords, initialNames, onNames, initialEmojis, onEmojis
         ) : null}
 
         <Pressable style={s.playBtn} onPress={start}>
-          <Text style={s.playText}>Play {GAME_META[sel.game].label} ▸</Text>
+          <Text style={s.playText}>{tr('Play {game} ▸', {game: tr(GAME_META[sel.game].label)})}</Text>
         </Pressable>
       </View>
 
       <View style={s.kofiRow}>
         <View style={{flex: 1}}>
           <Text style={s.kofiText}>
-            What does a Supernote dev do to procrastinate? Build a whole games plugin, of course!
-            If SuperFun brightens your breaks too, a coffee keeps it growing:
+            {tr('What does a Supernote dev do to procrastinate? Build a whole games plugin, of course! If SuperFun brightens your breaks too, a coffee keeps it growing:')}
           </Text>
           <Text selectable style={s.kofiLink}>https://ko-fi.com/agp42</Text>
         </View>
@@ -1366,13 +1369,13 @@ function TicTacToe({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}:
     onDelete(RESUME_KEY);
     if (who === 'O') {
       setScore(v => ({...v, you: v.you + 1}));
-      setEnd({msg: twoP ? `${e1}${p1} wins! 🎉` : WIN_MSGS[idx.current.win++ % WIN_MSGS.length], kind: 'win'});
+      setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e1 + p1}) : tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]), kind: 'win'});
     } else if (who === 'X') {
       setScore(v => ({...v, sn: v.sn + 1}));
-      setEnd({msg: twoP ? `${e2}${p2} wins! 🎉` : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length], kind: twoP ? 'win' : 'lose'});
+      setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e2 + p2}) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]), kind: twoP ? 'win' : 'lose'});
     } else {
       setScore(v => ({...v, draw: v.draw + 1}));
-      setEnd({msg: DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length], kind: 'draw'});
+      setEnd({msg: tr(DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length]), kind: 'draw'});
     }
   };
 
@@ -1395,8 +1398,8 @@ function TicTacToe({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}:
     setBoard(d.board.slice()); setTurn(d.turn === 'X' ? 'X' : 'O'); setScore(d.score || {you: 0, sn: 0, draw: 0});
     setBusy(false); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('ttt', diff, !over && !busy && board.some(Boolean) && (twoP || turn === 'O'), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board, turn, score}));
-  const saveNow = () => onSave({game: 'ttt', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board, turn, score}});
+  useResume(() => resumeSave('ttt', diff, !over && !busy && board.some(Boolean) && (twoP || turn === 'O'), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board, turn, score}));
+  const saveNow = () => onSave({game: 'ttt', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board, turn, score}});
   const play = (i: number) => {
     if (busy || over || board[i]) return;
     const cur = twoP ? turn : 'O';
@@ -1419,14 +1422,14 @@ function TicTacToe({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}:
   };
 
   const status = twoP
-    ? (turn === 'O' ? `${e1}${p1}'s turn (O)` : `${e2}${p2}'s turn (X)`)
-    : (busy ? 'SuperFun is thinking…' : 'Your turn');
+    ? (turn === 'O' ? tr("{name}'s turn (O)", {name: e1 + p1}) : tr("{name}'s turn (X)", {name: e2 + p2}))
+    : (busy ? tr('SuperFun is thinking…') : tr('Your turn'));
 
   return (
     <View style={s.container}>
       <GameHeader title="Tic-Tac-Toe" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newMatch} />
 
-      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text></Text> : <Text>You are <Text style={s.bold}>O</Text> · SuperFun is <Text style={s.bold}>X</Text> · {DIFFICULTIES[diff].label}</Text>}</Text>
+      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text></Text> : <Text>{tr('You are')} <Text style={s.bold}>O</Text> · {tr('SuperFun is')} <Text style={s.bold}>X</Text> · {tr(DIFFICULTIES[diff].label)}</Text>}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>
@@ -1455,14 +1458,14 @@ function TicTacToe({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}:
         </View>
 
         <View style={s.belowZone}>
-          {over ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}
+          {over ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}
         </View>
         {end ? <EndOverlay text={end.msg} /> : null}
       </View>
 
       <View style={s.scoreRow}>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : 'You'}</Text></View>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>Draws</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : tr('You')}</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>{tr('Draws')}</Text></View>
         <View style={s.scoreCell}><Text style={s.mpNum}>{score.sn}</Text><Text style={s.scoreWho}>{twoP ? `${e2}${p2}` : 'SuperFun'}</Text></View>
       </View>
 
@@ -1515,7 +1518,7 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
     setVal(Int8Array.from(d.val));
     setNotes(Uint16Array.from(d.notes));
     setLocked(new Set<number>(d.locked)); setWrong(new Set()); setSel(-1); setUndo([]);
-    setInfo('Loaded a saved grid');
+    setInfo(tr('Loaded a saved grid'));
     setShowSaved(false);
   };
 
@@ -1526,18 +1529,18 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
     const existed = saves.some(x => x.key === key);
     onSave({
       game: 'sudoku', key, ts: now(), diff,
-      label: `${DIFFICULTIES[diff].label} · ${filled} filled`,
+      label: tr('{diff} · {n} filled', {diff: tr(DIFFICULTIES[diff].label), n: filled}),
       data: {
         givens: Array.from(givens), solution: Array.from(solution),
         val: Array.from(val), notes: Array.from(notes), locked: Array.from(locked),
       },
     });
-    setInfo(existed ? `Updated grid #${key}` : saves.length >= 10 ? `Saved #${key} (oldest dropped)` : `Saved grid #${key}`);
+    setInfo(existed ? tr('Updated grid #{key}', {key}) : saves.length >= 10 ? tr('Saved #{key} (oldest dropped)', {key}) : tr('Saved grid #{key}', {key}));
   };
   useResume(() => {
     let filled = 0, solved = true;
     for (let i = 0; i < 81; i++) { if (val[i] !== 0 && givens[i] === 0) filled++; if (val[i] !== solution[i]) solved = false; }
-    return resumeSave('sudoku', diff, filled > 0 && !solved, `${DIFFICULTIES[diff].label} · ${filled} filled`,
+    return resumeSave('sudoku', diff, filled > 0 && !solved, tr('{diff} · {n} filled', {diff: tr(DIFFICULTIES[diff].label), n: filled}),
       {givens: Array.from(givens), solution: Array.from(solution), val: Array.from(val), notes: Array.from(notes), locked: Array.from(locked)});
   });
 
@@ -1548,7 +1551,7 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
   };
   const toggleNote = (d: number) => {
     if (sel < 0 || isLocked(sel)) return;
-    if (val[sel] !== 0) { setInfo('Clear the answer first to add notes'); return; }
+    if (val[sel] !== 0) { setInfo(tr('Clear the answer first to add notes')); return; }
     clearTransient(); pushUndo(sel);
     const nn = Uint16Array.from(notes); nn[sel] = nn[sel] ^ bit(d); setNotes(nn);
   };
@@ -1566,17 +1569,17 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
     const w = new Set<number>(); let filled = 0;
     for (let i = 0; i < 81; i++) if (givens[i] === 0 && !locked.has(i) && val[i] !== 0) { filled++; if (val[i] !== solution[i]) w.add(i); }
     setWrong(w);
-    setInfo(filled === 0 ? 'Nothing to check yet' : w.size === 0 ? 'All entries correct so far ✓' : `${w.size} wrong so far`);
+    setInfo(filled === 0 ? tr('Nothing to check yet') : w.size === 0 ? tr('All entries correct so far ✓') : tr('{n} wrong so far', {n: w.size}));
   };
   const giveOne = () => {
     const empties: number[] = [];
     for (let i = 0; i < 81; i++) if (val[i] === 0 && givens[i] === 0 && !locked.has(i)) empties.push(i);
-    if (!empties.length) { setInfo('No empty cell to reveal'); return; }
+    if (!empties.length) { setInfo(tr('No empty cell to reveal')); return; }
     const pick = empties[Math.floor(Math.random() * empties.length)];
     setVal(v => { const nv = Int8Array.from(v); nv[pick] = solution[pick]; return nv; });
     setNotes(n => { const nn = Uint16Array.from(n); nn[pick] = 0; return nn; });
     setLocked(prev => new Set(prev).add(pick));
-    setWrong(new Set()); setSel(-1); setInfo('Revealed one cell'); setHints(h => h + 1);
+    setWrong(new Set()); setSel(-1); setInfo(tr('Revealed one cell')); setHints(h => h + 1);
   };
 
   let solved = true;
@@ -1590,25 +1593,25 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
 
   return (
     <View style={s.container}>
-      <GameHeader title={`Sudoku · ${DIFFICULTIES[diff].label}`} onMenu={onMenu} onUndo={doUndo} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newPuzzle} />
-      <Text style={s.tttLegend}>Hints used: {hints}{st.showBest && best != null ? ` · Best (${DIFFICULTIES[diff].label}): ${best === 0 ? 'no hints!' : best}` : ''}</Text>
+      <GameHeader title={`Sudoku · ${tr(DIFFICULTIES[diff].label)}`} onMenu={onMenu} onUndo={doUndo} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newPuzzle} />
+      <Text style={s.tttLegend}>{tr('Hints used: {n}', {n: hints})}{st.showBest && best != null ? ' · ' + tr('Best ({diff}): {v}', {diff: tr(DIFFICULTIES[diff].label), v: best === 0 ? tr('no hints!') : best}) : ''}</Text>
 
       <View style={s.msgZone}>
-        {solved ? null : <Text style={s.hintText}>{selectable ? (notesEnabled ? 'Answer = final value · Notes = candidates' : 'This cell has an answer — tap it again to clear it') : 'Tap an empty cell'}</Text>}
+        {solved ? null : <Text style={s.hintText}>{selectable ? (notesEnabled ? tr('Answer = final value · Notes = candidates') : tr('This cell has an answer — tap it again to clear it')) : tr('Tap an empty cell')}</Text>}
       </View>
 
       <View style={s.centerArea}>
         <Board givens={givens} val={val} notes={notes} sel={sel} wrong={wrong}
           onSelect={i => { clearTransient(); if (isLocked(i)) { setSel(-1); return; } setSel(prev => (prev === i ? -1 : i)); }}
         />
-        {solved ? <EndOverlay text={hints === 0 ? 'Solved — no hints! 🎉' : `Solved with ${hints} hint${hints > 1 ? 's' : ''}! 🎉`} /> : null}
+        {solved ? <EndOverlay text={hints === 0 ? tr('Solved — no hints! 🎉') : hints === 1 ? tr('Solved with 1 hint! 🎉') : tr('Solved with {n} hints! 🎉', {n: hints})} /> : null}
       </View>
       <View style={s.belowZone}>
-        {solved ? <Pressable style={s.playAgainBtn} onPress={newPuzzle}><Text style={s.playText}>New game ▸</Text></Pressable> : null}
+        {solved ? <Pressable style={s.playAgainBtn} onPress={newPuzzle}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable> : null}
       </View>
 
       {/* controls live at the bottom, under the board */}
-      <Text style={s.sectionLabel}>Answer</Text>
+      <Text style={s.sectionLabel}>{tr('Answer')}</Text>
       <View style={s.padRow}>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => {
           const on = selectable && curVal === d;
@@ -1619,7 +1622,7 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
           );
         })}
       </View>
-      <Text style={[s.sectionLabel, !notesEnabled && s.labelDim]}>Notes</Text>
+      <Text style={[s.sectionLabel, !notesEnabled && s.labelDim]}>{tr('Notes')}</Text>
       <View style={s.padRow}>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => {
           const on = notesEnabled && (curNotes & bit(d)) !== 0;
@@ -1632,8 +1635,8 @@ function SudokuGame({diff, onMenu, saves, onSave, onDelete, st}: {
       </View>
       <View style={s.feedbackZone}>{info ? <Text style={s.feedbackText}>{info}</Text> : null}</View>
       <View style={s.actionRow}>
-        <Pressable style={s.actionBtn} onPress={check}><Text style={s.actionText}>Check answers</Text></Pressable>
-        <Pressable style={s.actionBtn} onPress={giveOne}><Text style={s.actionText}>Give 1 answer</Text></Pressable>
+        <Pressable style={s.actionBtn} onPress={check}><Text style={s.actionText}>{tr('Check answers')}</Text></Pressable>
+        <Pressable style={s.actionBtn} onPress={giveOne}><Text style={s.actionText}>{tr('Give 1 answer')}</Text></Pressable>
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -1699,8 +1702,8 @@ function ConnectFour({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
 
   const finish = (who: string) => {
     onDelete(RESUME_KEY);
-    if (who === 'O') { setScore(v => ({...v, you: v.you + 1})); setEnd({msg: twoP ? `${e1}${p1} wins! 🎉` : pick(C4_WIN, idx.current.win++), kind: 'win'}); }
-    else if (who === 'X') { setScore(v => ({...v, sn: v.sn + 1})); setEnd({msg: twoP ? `${e2}${p2} wins! 🎉` : pick(C4_LOSE, idx.current.lose++), kind: twoP ? 'win' : 'lose'}); }
+    if (who === 'O') { setScore(v => ({...v, you: v.you + 1})); setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e1 + p1}) : pick(C4_WIN, idx.current.win++), kind: 'win'}); }
+    else if (who === 'X') { setScore(v => ({...v, sn: v.sn + 1})); setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e2 + p2}) : pick(C4_LOSE, idx.current.lose++), kind: twoP ? 'win' : 'lose'}); }
     else { setScore(v => ({...v, draw: v.draw + 1})); setEnd({msg: pick(DRAW_MSGS, idx.current.draw++), kind: 'draw'}); }
   };
   const playAgain = () => { if (timer.current) clearTimeout(timer.current); setBoard(Array(42).fill('')); setBusy(false); setEnd(null); setTurn('O'); };
@@ -1713,8 +1716,8 @@ function ConnectFour({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
     setBoard(d.board.slice()); setTurn(d.turn === 'X' ? 'X' : 'O'); setScore(d.score || {you: 0, sn: 0, draw: 0});
     setBusy(false); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('c4', diff, !over && !busy && board.some(Boolean) && (twoP || turn === 'O'), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board, turn, score}));
-  const saveNow = () => onSave({game: 'c4', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board, turn, score}});
+  useResume(() => resumeSave('c4', diff, !over && !busy && board.some(Boolean) && (twoP || turn === 'O'), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board, turn, score}));
+  const saveNow = () => onSave({game: 'c4', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board, turn, score}});
   const dropCol = (col: number) => {
     if (busy || over) return;
     const cur = twoP ? turn : 'O';
@@ -1740,11 +1743,11 @@ function ConnectFour({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
   return (
     <View style={s.container}>
       <GameHeader title="Connect Four" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newMatch} />
-      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text></Text> : <Text>You are <Text style={s.bold}>O</Text> · SuperFun is <Text style={s.bold}>X</Text> · {DIFFICULTIES[diff].label}</Text>}</Text>
+      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text></Text> : <Text>{tr('You are')} <Text style={s.bold}>O</Text> · {tr('SuperFun is')} <Text style={s.bold}>X</Text> · {tr(DIFFICULTIES[diff].label)}</Text>}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>
-          {end ? null : <Text style={twoP ? s.turnBig : s.statusBig}>{twoP ? (turn === 'O' ? `${e1}${p1}'s turn (O) — tap a column` : `${e2}${p2}'s turn (X) — tap a column`) : (busy ? 'SuperFun is thinking…' : 'Your turn — tap a column')}</Text>}
+          {end ? null : <Text style={twoP ? s.turnBig : s.statusBig}>{twoP ? (turn === 'O' ? tr("{name}'s turn (O) — tap a column", {name: e1 + p1}) : tr("{name}'s turn (X) — tap a column", {name: e2 + p2})) : (busy ? tr('SuperFun is thinking…') : tr('Your turn — tap a column'))}</Text>}
         </View>
         <View style={s.c4Board}>
           {[0, 1, 2, 3, 4, 5].map(r => (
@@ -1765,14 +1768,14 @@ function ConnectFour({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
           {[1, 2, 3, 4, 5].map(r => <View key={'h' + r} pointerEvents="none" style={[s.gridLineH, {top: C4CELL * r - 1, width: C4CELL * 7}]} />)}
         </View>
         <View style={s.belowZone}>
-          {over ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}
+          {over ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}
         </View>
         {end ? <EndOverlay text={end.msg} /> : null}
       </View>
 
       <View style={s.scoreRow}>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : 'You'}</Text></View>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>Draws</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : tr('You')}</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>{tr('Draws')}</Text></View>
         <View style={s.scoreCell}><Text style={s.mpNum}>{score.sn}</Text><Text style={s.scoreWho}>{twoP ? `${e2}${p2}` : 'SuperFun'}</Text></View>
       </View>
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -1805,9 +1808,9 @@ function UltimateTTT({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
 
   const finish = (w: number) => {
     onDelete(RESUME_KEY);
-    if (w === 1) { setScore(v => ({...v, you: v.you + 1})); setEnd({msg: twoP ? `${e1}${p1} wins! 🎉` : WIN_MSGS[idx.current.win++ % WIN_MSGS.length]}); }
-    else if (w === 2) { setScore(v => ({...v, sn: v.sn + 1})); setEnd({msg: twoP ? `${e2}${p2} wins! 🎉` : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]}); }
-    else { setScore(v => ({...v, draw: v.draw + 1})); setEnd({msg: DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length]}); }
+    if (w === 1) { setScore(v => ({...v, you: v.you + 1})); setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e1 + p1}) : tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length])}); }
+    else if (w === 2) { setScore(v => ({...v, sn: v.sn + 1})); setEnd({msg: twoP ? tr('{name} wins! 🎉', {name: e2 + p2}) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length])}); }
+    else { setScore(v => ({...v, draw: v.draw + 1})); setEnd({msg: tr(DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length])}); }
   };
   const playAgain = () => { if (timer.current) clearTimeout(timer.current); setSt(U.initState()); setBusy(false); setEnd(null); setReject(null); };
   const newMatch = () => { playAgain(); setScore({you: 0, sn: 0, draw: 0}); };
@@ -1818,9 +1821,9 @@ function UltimateTTT({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
 
   // Why is this square locked? (only called for a tap that got rejected)
   const whyBlocked = (b: number, c: number) => {
-    if (st.cells[b * 9 + c]) return 'That square is already taken — pick an empty one.';
-    if (st.sub[b] !== 0) return 'That board is already finished — pick the highlighted one.';
-    return 'Locked this turn: the last move sends you to the highlighted board.';
+    if (st.cells[b * 9 + c]) return tr('That square is already taken — pick an empty one.');
+    if (st.sub[b] !== 0) return tr('That board is already finished — pick the highlighted one.');
+    return tr('Locked this turn: the last move sends you to the highlighted board.');
   };
   const flashReject = (cell: number, msg: string) => {
     setReject({idx: cell, msg});
@@ -1857,16 +1860,16 @@ function UltimateTTT({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
   };
 
   const saveNow = () => {
-    if (over) { setReject({idx: -1, msg: 'Nothing to save — the game is over.'}); if (rejTimer.current) clearTimeout(rejTimer.current); rejTimer.current = setTimeout(() => setReject(null), 1800); return; }
+    if (over) { setReject({idx: -1, msg: tr('Nothing to save — the game is over.')}); if (rejTimer.current) clearTimeout(rejTimer.current); rejTimer.current = setTimeout(() => setReject(null), 1800); return; }
     const moves = Array.from(st.cells).filter(v => v).length;
     const key = String(Date.now()).slice(-6);
     onSave({
       game: 'uttt', key, ts: Date.now(), diff,
-      label: twoP ? `${p1} vs ${p2} · ${moves} moves` : `vs SuperFun (${DIFFICULTIES[diff].label}) · ${moves} moves`,
+      label: (twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)})) + ' · ' + tr('{n} moves', {n: moves}),
       data: {cells: Array.from(st.cells), sub: Array.from(st.sub), active: st.active, turn: st.turn, score},
     });
   };
-  useResume(() => resumeSave('uttt', diff, !over && Array.from(st.cells).some(v => v), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {cells: Array.from(st.cells), sub: Array.from(st.sub), active: st.active, turn: st.turn, score}));
+  useResume(() => resumeSave('uttt', diff, !over && Array.from(st.cells).some(v => v), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {cells: Array.from(st.cells), sub: Array.from(st.sub), active: st.active, turn: st.turn, score}));
   const loadSave = (sv: GameSave) => {
     if (timer.current) clearTimeout(timer.current);
     const d = sv.data || {};
@@ -1878,14 +1881,14 @@ function UltimateTTT({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
     if (!twoP && d.turn === 2 && U.winner(loaded) === 0) aiRespond(loaded); // AI to move in a loaded solo game
   };
 
-  const whoseTurn = twoP ? (st.turn === 1 ? `${e1}${p1}'s turn (O)` : `${e2}${p2}'s turn (X)`) : 'Your turn';
-  const constraint = st.active === -1 ? 'play in any open board' : 'play in the highlighted board';
-  const status = busy && !twoP ? 'SuperFun is thinking…' : `${whoseTurn} · ${constraint}`;
+  const whoseTurn = twoP ? (st.turn === 1 ? tr("{name}'s turn (O)", {name: e1 + p1}) : tr("{name}'s turn (X)", {name: e2 + p2})) : tr('Your turn');
+  const constraint = st.active === -1 ? tr('play in any open board') : tr('play in the highlighted board');
+  const status = busy && !twoP ? tr('SuperFun is thinking…') : `${whoseTurn} · ${constraint}`;
 
   return (
     <View style={s.container}>
       <GameHeader title="Ultimate TTT" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newMatch} />
-      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text> · win a board to claim it</Text> : <Text>You are <Text style={s.bold}>O</Text> · SuperFun is <Text style={s.bold}>X</Text> · {DIFFICULTIES[diff].label}</Text>}</Text>
+      <Text style={s.tttLegend}>{twoP ? <Text>{e1}{p1} = <Text style={s.bold}>O</Text> · {e2}{p2} = <Text style={s.bold}>X</Text> · {tr('win a board to claim it')}</Text> : <Text>{tr('You are')} <Text style={s.bold}>O</Text> · {tr('SuperFun is')} <Text style={s.bold}>X</Text> · {tr(DIFFICULTIES[diff].label)}</Text>}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>
@@ -1930,15 +1933,15 @@ function UltimateTTT({diff, mode, names, emojis, onMenu, saves, onSave, onDelete
 
         <View style={s.belowZone}>
           {over
-            ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>Play again ▸</Text></Pressable>
-            : <Text style={s.uHint}>Bright board = play here · greyed boards are locked this turn</Text>}
+            ? <Pressable style={s.playAgainBtn} onPress={playAgain}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable>
+            : <Text style={s.uHint}>{tr('Bright board = play here · greyed boards are locked this turn')}</Text>}
         </View>
         {end ? <EndOverlay text={end.msg} /> : null}
       </View>
 
       <View style={s.scoreRow}>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : 'You'}</Text></View>
-        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>Draws</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.you}</Text><Text style={s.scoreWho}>{twoP ? `${e1}${p1}` : tr('You')}</Text></View>
+        <View style={s.scoreCell}><Text style={s.mpNum}>{score.draw}</Text><Text style={s.scoreWho}>{tr('Draws')}</Text></View>
         <View style={s.scoreCell}><Text style={s.mpNum}>{score.sn}</Text><Text style={s.scoreWho}>{twoP ? `${e2}${p2}` : 'SuperFun'}</Text></View>
       </View>
       {rules ? <RulesModal game="uttt" onClose={() => setRules(false)} /> : null}
@@ -1974,22 +1977,22 @@ function Minesweeper({diff, onMenu, saves, onSave, onDelete, st}: {
     setDead(false); setWon(false); setEnd(null); setInfo(null); setMode('dig');
   };
   const saveNow = () => {
-    if (!board) { setInfo('Start digging first'); return; }
+    if (!board) { setInfo(tr('Start digging first')); return; }
     const key = mineKey(board.mine, R, C);
     const existed = saves.some(x => x.key === key);
     let opened = 0;
     for (let i = 0; i < R * C; i++) if (revealed[i] && !board.mine[i]) opened++;
     onSave({
       game: 'mines', key, ts: Date.now(), diff,
-      label: `${DIFFICULTIES[diff].label} ${R}×${C} · ${opened} open`,
+      label: tr('{diff} {R}×{C} · {n} open', {diff: tr(DIFFICULTIES[diff].label), R, C, n: opened}),
       data: {rows: R, cols: C, mines: MINES, mine: board.mine, count: Array.from(board.count), revealed: revealed.slice(), flags: flags.slice(), dead, won},
     });
-    setInfo(existed ? `Updated grid #${key}` : `Saved grid #${key}`);
+    setInfo(existed ? tr('Updated grid #{key}', {key}) : tr('Saved grid #{key}', {key}));
   };
   useResume(() => {
     if (!board) return null;
     let opened = 0; for (let i = 0; i < R * C; i++) if (revealed[i] && !board.mine[i]) opened++;
-    return resumeSave('mines', diff, !dead && !won && opened > 0, `${DIFFICULTIES[diff].label} ${R}×${C} · ${opened} open`,
+    return resumeSave('mines', diff, !dead && !won && opened > 0, tr('{diff} {R}×{C} · {n} open', {diff: tr(DIFFICULTIES[diff].label), R, C, n: opened}),
       {rows: R, cols: C, mines: MINES, mine: board.mine, count: Array.from(board.count), revealed: revealed.slice(), flags: flags.slice(), dead, won});
   });
   const loadSave = (sv: GameSave) => {
@@ -1998,7 +2001,7 @@ function Minesweeper({diff, onMenu, saves, onSave, onDelete, st}: {
     setDims({rows: d.rows, cols: d.cols, mines: d.mines});
     setBoard({mine: d.mine, count: Int8Array.from(d.count)});
     setRevealed(d.revealed.slice()); setFlags(d.flags.slice());
-    setDead(!!d.dead); setWon(!!d.won); setEnd(null); setInfo('Loaded a saved board'); setShowSaved(false); setMode('dig');
+    setDead(!!d.dead); setWon(!!d.won); setEnd(null); setInfo(tr('Loaded a saved board')); setShowSaved(false); setMode('dig');
   };
 
   const flood = (b: {mine: boolean[]; count: Int8Array}, rev: boolean[], start: number) => {
@@ -2040,10 +2043,10 @@ function Minesweeper({diff, onMenu, saves, onSave, onDelete, st}: {
 
   return (
     <View style={s.container}>
-      <GameHeader title={`Minesweeper · ${DIFFICULTIES[diff].label}`} onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
+      <GameHeader title={`${tr('Minesweeper')} · ${tr(DIFFICULTIES[diff].label)}`} onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
 
       <View style={s.msgZone}>
-        {end ? null : <Text style={s.hintText}>{info || `Mines: ${MINES} · Flags: ${flagCount}`}</Text>}
+        {end ? null : <Text style={s.hintText}>{info || tr('Mines: {m} · Flags: {f}', {m: MINES, f: flagCount})}</Text>}
       </View>
 
       <View style={s.centerArea}>
@@ -2069,13 +2072,13 @@ function Minesweeper({diff, onMenu, saves, onSave, onDelete, st}: {
           ))}
         </View>
         <View style={s.belowZone}>
-          {(dead || won) ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>New game ▸</Text></Pressable> : null}
+          {(dead || won) ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable> : null}
         </View>
         {end ? <EndOverlay text={end.msg} /> : null}
       </View>
       <View style={s.actionRow}>
-        <Pressable style={[s.actionBtn, mode === 'dig' && s.solidBtn]} onPress={() => setMode('dig')}><Text style={[s.actionText, mode === 'dig' && s.solidText]}>Dig</Text></Pressable>
-        <Pressable style={[s.actionBtn, mode === 'flag' && s.solidBtn]} onPress={() => setMode('flag')}><Text style={[s.actionText, mode === 'flag' && s.solidText]}>Flag ⚑</Text></Pressable>
+        <Pressable style={[s.actionBtn, mode === 'dig' && s.solidBtn]} onPress={() => setMode('dig')}><Text style={[s.actionText, mode === 'dig' && s.solidText]}>{tr('Dig')}</Text></Pressable>
+        <Pressable style={[s.actionBtn, mode === 'flag' && s.solidBtn]} onPress={() => setMode('flag')}><Text style={[s.actionText, mode === 'flag' && s.solidText]}>{tr('Flag ⚑')}</Text></Pressable>
       </View>
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
       {rules ? <RulesModal game="mines" onClose={() => setRules(false)} /> : null}
@@ -2114,29 +2117,29 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
     for (let i = 0; i < size * size; i++) if (fill[i]) filled++;
     onSave({
       game: 'nono', key, ts: Date.now(), diff,
-      label: `${DIFFICULTIES[diff].label} ${size}×${size} · ${filled} cells`,
+      label: tr('{diff} {size}×{size} · {n} cells', {diff: tr(DIFFICULTIES[diff].label), size, n: filled}),
       data: {size, name: puz.name, solution: puz.solution, rowClues: puz.rowClues, colClues: puz.colClues, fill: fill.map(Boolean), marks: marks.map(Boolean)},
     });
-    setInfo(existed ? `Updated grid #${key}` : `Saved grid #${key}`);
+    setInfo(existed ? tr('Updated grid #{key}', {key}) : tr('Saved grid #{key}', {key}));
   };
   const loadSave = (sv: GameSave) => {
     const d = sv.data || {};
     if (!d.size || !Array.isArray(d.fill) || d.fill.length !== d.size * d.size) return;
     setPuz({size: d.size, solution: d.solution, rowClues: d.rowClues, colClues: d.colClues, name: d.name});
     setFill(d.fill.slice()); setMarks(d.marks.slice());
-    setShown(false); setEnd(null); setInfo('Loaded a saved grid'); setShowSaved(false); setMode('fill');
+    setShown(false); setEnd(null); setInfo(tr('Loaded a saved grid')); setShowSaved(false); setMode('fill');
   };
 
   const solved = useMemo(() => NONO.validate(fill, puz.rowClues, puz.colClues, size), [fill, puz, size]);
   const won = end?.kind === 'win';
-  useResume(() => resumeSave('nono', diff, !solved && fill.some(Boolean), `${DIFFICULTIES[diff].label} ${size}×${size}`, {size, name: puz.name, solution: puz.solution, rowClues: puz.rowClues, colClues: puz.colClues, fill: fill.map(Boolean), marks: marks.map(Boolean)}));
+  useResume(() => resumeSave('nono', diff, !solved && fill.some(Boolean), `${tr(DIFFICULTIES[diff].label)} ${size}×${size}`, {size, name: puz.name, solution: puz.solution, rowClues: puz.rowClues, colClues: puz.colClues, fill: fill.map(Boolean), marks: marks.map(Boolean)}));
   useEffect(() => {
     if (solved && !won && !shown) {
       const n = (puz as any).name || 'picture';
       const art = /^[aeiou]/i.test(n) ? 'an' : 'a';
       st.markPicture(`${size}:${n}`); // add to the picture gallery
       onDelete(RESUME_KEY);
-      setEnd({msg: `It's ${art} ${n}! 🎉`, kind: 'win'});
+      setEnd({msg: getLang() === 'en' ? `It's ${art} ${n}! 🎉` : tr('It\'s: {name}! 🎉', {name: tr(n)}), kind: 'win'});
     }
   }, [solved, won, shown, puz]);
 
@@ -2148,7 +2151,7 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
     const p = diffs[Math.floor(Math.random() * diffs.length)];
     setFill(f => { const nf = f.slice(); nf[p] = !!puz.solution[p]; return nf; });
     setMarks(m => { const nm = m.slice(); nm[p] = false; return nm; });
-    setEnd(null); setInfo('Hint added — one cell fixed ✓');
+    setEnd(null); setInfo(tr('Hint added — one cell fixed ✓'));
   };
   const reveal = () => {
     setFill(puz.solution.slice());
@@ -2171,9 +2174,9 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
   const check = () => {
     let wrong = 0, filled = 0;
     for (let i = 0; i < size * size; i++) if (fill[i]) { filled++; if (!puz.solution[i]) wrong++; }
-    if (filled === 0) { setInfo('Fill some cells first, then Check.'); return; }
-    if (wrong === 0) setInfo(`So far so good — all ${filled} filled cells are correct ✓`);
-    else setInfo(`${wrong} of ${filled} filled cell${wrong === 1 ? ' is' : 's are'} wrong ✗`);
+    if (filled === 0) { setInfo(tr('Fill some cells first, then Check.')); return; }
+    if (wrong === 0) setInfo(tr('So far so good — all {n} filled cells are correct ✓', {n: filled}));
+    else setInfo(wrong === 1 ? tr('1 of {n} filled cells is wrong ✗', {n: filled}) : tr('{w} of {n} filled cells are wrong ✗', {w: wrong, n: filled}));
   };
 
   const maxRC = Math.max(1, ...puz.rowClues.map(a => a.length));
@@ -2185,10 +2188,10 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
 
   return (
     <View style={s.container}>
-      <GameHeader title={`Nonogram · ${DIFFICULTIES[diff].label}`} onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
+      <GameHeader title={`${tr('Nonogram')} · ${tr(DIFFICULTIES[diff].label)}`} onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
 
       <View style={s.msgZone}>
-        {end ? null : <Text style={s.hintText}>Match every row &amp; column clue.</Text>}
+        {end ? null : <Text style={s.hintText}>{tr('Match every row & column clue.')}</Text>}
       </View>
 
       <View style={s.centerArea}>
@@ -2231,19 +2234,19 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
         {end ? <EndOverlay text={end.msg} /> : null}
       </View>
       <View style={s.belowZone}>
-        {solved ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>New game ▸</Text></Pressable> : null}
+        {solved ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable> : null}
       </View>
 
       {/* game controls at the bottom, under the grid */}
       <View style={s.feedbackZone}>{info ? <Text style={s.feedbackText}>{info}</Text> : null}</View>
       <View style={s.actionRow}>
-        <Pressable style={[s.actionBtn, mode === 'fill' && s.solidBtn]} onPress={() => setMode('fill')}><Text style={[s.actionText, mode === 'fill' && s.solidText]}>Fill ■</Text></Pressable>
-        <Pressable style={[s.actionBtn, mode === 'mark' && s.solidBtn]} onPress={() => setMode('mark')}><Text style={[s.actionText, mode === 'mark' && s.solidText]}>Mark ✕</Text></Pressable>
+        <Pressable style={[s.actionBtn, mode === 'fill' && s.solidBtn]} onPress={() => setMode('fill')}><Text style={[s.actionText, mode === 'fill' && s.solidText]}>{tr('Fill ■')}</Text></Pressable>
+        <Pressable style={[s.actionBtn, mode === 'mark' && s.solidBtn]} onPress={() => setMode('mark')}><Text style={[s.actionText, mode === 'mark' && s.solidText]}>{tr('Mark ✕')}</Text></Pressable>
       </View>
       <View style={s.actionRow}>
-        <Pressable style={s.actionBtn} onPress={check}><Text style={s.actionText}>Check</Text></Pressable>
-        <Pressable style={s.actionBtn} onPress={hint}><Text style={s.actionText}>Hint</Text></Pressable>
-        <Pressable style={s.actionBtn} onPress={reveal}><Text style={s.actionText}>Solution</Text></Pressable>
+        <Pressable style={s.actionBtn} onPress={check}><Text style={s.actionText}>{tr('Check')}</Text></Pressable>
+        <Pressable style={s.actionBtn} onPress={hint}><Text style={s.actionText}>{tr('Hint')}</Text></Pressable>
+        <Pressable style={s.actionBtn} onPress={reveal}><Text style={s.actionText}>{tr('Solution')}</Text></Pressable>
       </View>
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
       {rules ? <RulesModal game="nono" onClose={() => setRules(false)} /> : null}
@@ -2256,8 +2259,8 @@ function Nonogram({diff, onMenu, saves, onSave, onDelete, st}: {
 function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
   diff: Diff; onMenu: () => void; saves: GameSave[]; onSave: (s: GameSave) => void; onDelete: (key: string) => void; st: any;
 }): React.JSX.Element {
-  const [lang, setLang] = useState<string>('en');
-  const [puz, setPuz] = useState<any>(() => W.generate(diff, 'en'));
+  const [lang, setWordLang] = useState<string>(() => getLang());
+  const [puz, setPuz] = useState<any>(() => W.generate(diff, getLang()));
   const [start, setStart] = useState<number | null>(null);
   const [end, setEnd] = useState<{msg: string} | null>(null);
   const [flash, setFlash] = useState('');
@@ -2277,7 +2280,7 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
   puz.words.forEach((w: any) => { if (w.found) w.cells.forEach((c: number) => foundSet.add(c)); });
 
   const fresh = (l: string) => { setPuz(W.generate(diff, l)); setStart(null); setEnd(null); setFlash(''); setHintCell(null); setSpot(null); };
-  const pickLang = (l: string) => { if (l === lang) return; setLang(l); fresh(l); };
+  const pickLang = (l: string) => { if (l === lang) return; setWordLang(l); fresh(l); };
   const newRound = () => fresh(lang);
 
   const wsKey = (grid: string[]) => {
@@ -2291,18 +2294,18 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
     const existed = saves.some(x => x.key === key);
     onSave({
       game: 'words', key, ts: Date.now(), diff,
-      label: `${puz.theme} · ${W.TIERS[diff].label} · ${foundCount}/${total}`,
+      label: `${puz.theme} · ${tr(W.TIERS[diff].label)} · ${foundCount}/${total}`,
       data: {size: puz.size, tier: puz.tier, theme: puz.theme, lang: puz.lang, grid: puz.grid, words: puz.words},
     });
-    setFlash(existed ? 'Updated this grid' : 'Saved this grid');
+    setFlash(existed ? tr('Updated this grid') : tr('Saved this grid'));
   };
   useResume(() => resumeSave('words', diff, foundCount > 0 && !end, `${puz.theme} · ${foundCount}/${total}`, {size: puz.size, tier: puz.tier, theme: puz.theme, lang: puz.lang, grid: puz.grid, words: puz.words}));
   const loadSave = (sv: GameSave) => {
     const d = sv.data || {};
     if (!d.size || !Array.isArray(d.grid) || !Array.isArray(d.words)) return;
     setPuz({size: d.size, tier: d.tier, theme: d.theme, lang: d.lang, grid: d.grid, words: d.words});
-    setLang(d.lang);
-    setStart(null); setEnd(null); setFlash('Loaded a saved grid'); setShowSaved(false); setHintCell(null); setSpot(null);
+    setWordLang(d.lang);
+    setStart(null); setEnd(null); setFlash(tr('Loaded a saved grid')); setShowSaved(false); setHintCell(null); setSpot(null);
   };
 
   const tap = (idx: number) => {
@@ -2318,11 +2321,11 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
     if (wi >= 0) {
       const words = puz.words.map((w: any, i: number) => (i === wi ? {...w, found: true} : w));
       setPuz({...puz, words});
-      setFlash(`Found ${words[wi].text} ✓`);
+      setFlash(tr('Found {w} ✓', {w: words[wi].text}));
       setHintCell(null);
-      if (words.filter((w: any) => w.found).length === words.length) { st.counter('words'); onDelete(RESUME_KEY); setEnd({msg: 'All found! 🎉'}); }
+      if (words.filter((w: any) => w.found).length === words.length) { st.counter('words'); onDelete(RESUME_KEY); setEnd({msg: tr('All found! 🎉')}); }
     } else {
-      setFlash('Not on the list — try again');
+      setFlash(tr('Not on the list — try again'));
     }
   };
 
@@ -2332,16 +2335,16 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
   // Hint: box the first letter of a still-unfound word.
   const hint = () => {
     const un = puz.words.filter((w: any) => !w.found);
-    if (!un.length) { setFlash('Every word is already found ✓'); return; }
+    if (!un.length) { setFlash(tr('Every word is already found ✓')); return; }
     const w = un[Math.floor(Math.random() * un.length)];
     setHintCell(w.cells[0]);
-    setFlash(`Hint: a ${w.text.length}-letter word starts in the box`);
+    setFlash(tr('Hint: a {n}-letter word starts in the box', {n: w.text.length}));
   };
 
   // Show solution: mark every word found (does not count as a solve).
   const solve = () => {
     setPuz({...puz, words: puz.words.map((w: any) => ({...w, found: true}))});
-    setStart(null); setHintCell(null); setEnd({msg: 'Solution shown 👀'});
+    setStart(null); setHintCell(null); setEnd({msg: tr('Solution shown 👀')});
   };
 
   // strike-through lines drawn over each found word (from first to last letter)
@@ -2359,7 +2362,7 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
     <View style={s.container}>
       <GameHeader title="Word Search" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newRound} />
 
-      <Text style={s.wsTheme}>{puz.theme} · {W.TIERS[diff].label}</Text>
+      <Text style={s.wsTheme}>{puz.theme} · {tr(W.TIERS[diff].label)}</Text>
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 2}}>
         {W.LANGS.map((L: any) => (
           <Pressable key={L.key} onPress={() => pickLang(L.key)} style={[s.wsLangBtn, lang === L.key && s.solidBtn]}>
@@ -2369,14 +2372,14 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
       </View>
 
       <View style={s.wsControls}>
-        <Pressable onPress={hint} style={s.segBtn}><Text style={s.segTxt}>💡 Hint</Text></Pressable>
-        <Pressable onPress={() => setShowWords(v => !v)} style={[s.segBtn, !showWords && s.segOn]}><Text style={[s.segTxt, !showWords && s.solidText]}>{showWords ? 'Hide list' : 'Show list'}</Text></Pressable>
-        <Pressable onPress={solve} style={s.segBtn}><Text style={s.segTxt}>Solution</Text></Pressable>
-        {spot ? <Pressable onPress={() => setSpot(null)} style={[s.segBtn, s.segOn]}><Text style={[s.segTxt, s.solidText]}>Clear “{spot}”</Text></Pressable> : null}
+        <Pressable onPress={hint} style={s.segBtn}><Text style={s.segTxt}>{tr('💡 Hint')}</Text></Pressable>
+        <Pressable onPress={() => setShowWords(v => !v)} style={[s.segBtn, !showWords && s.segOn]}><Text style={[s.segTxt, !showWords && s.solidText]}>{showWords ? tr('Hide list') : tr('Show list')}</Text></Pressable>
+        <Pressable onPress={solve} style={s.segBtn}><Text style={s.segTxt}>{tr('Solution')}</Text></Pressable>
+        {spot ? <Pressable onPress={() => setSpot(null)} style={[s.segBtn, s.segOn]}><Text style={[s.segTxt, s.solidText]}>{tr('Clear “{l}”', {l: spot})}</Text></Pressable> : null}
       </View>
 
       <View style={s.msgZone}>
-        <Text style={s.statusBig}>{flash || (start !== null ? 'Now tap the last letter' : `${foundCount} / ${total} found`)}</Text>
+        <Text style={s.statusBig}>{flash || (start !== null ? tr('Now tap the last letter') : tr('{n} / {t} found', {n: foundCount, t: total}))}</Text>
       </View>
 
       <View style={{position: 'relative', alignSelf: 'center'}}>
@@ -2411,13 +2414,13 @@ function WordSearch({diff, onMenu, saves, onSave, onDelete, st}: {
         </View>
       ) : (
         <View style={s.wsWordsWrap}>
-          <Text style={s.wsHidden}>List hidden — {total - foundCount} word{total - foundCount === 1 ? '' : 's'} left to find</Text>
+          <Text style={s.wsHidden}>{total - foundCount === 1 ? tr('List hidden — 1 word left to find') : tr('List hidden — {n} words left to find', {n: total - foundCount})}</Text>
         </View>
       )}
-      <Text style={s.wsTip}>Tip: long-press any letter to light up every copy of it.</Text>
+      <Text style={s.wsTip}>{tr('Tip: long-press any letter to light up every copy of it.')}</Text>
 
       <View style={s.belowZone}>
-        {end ? <Pressable style={s.playAgainBtn} onPress={newRound}><Text style={s.playText}>New game ▸</Text></Pressable> : null}
+        {end ? <Pressable style={s.playAgainBtn} onPress={newRound}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable> : null}
       </View>
 
       {rules ? <RulesModal game="words" onClose={() => setRules(false)} /> : null}
@@ -2454,8 +2457,8 @@ function Game2048({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMe
     setSize(d.size); setTarget(d.target || 2048); setBoard(d.board.slice()); setScore(d.score || 0); setWon(!!d.won);
     setWonBanner(false); setLastSpawn(-1); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('2048', diff, score > 0 && !end, `top tile ${G2048.maxTile(board)} · score ${score}`, {size, target, board, score, won}));
-  const saveNow = () => onSave({game: '2048', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `top tile ${G2048.maxTile(board)} · score ${score}`, data: {size, target, board, score, won}});
+  useResume(() => resumeSave('2048', diff, score > 0 && !end, tr('top tile {t} · score {s}', {t: G2048.maxTile(board), s: score}), {size, target, board, score, won}));
+  const saveNow = () => onSave({game: '2048', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: tr('top tile {t} · score {s}', {t: G2048.maxTile(board), s: score}), data: {size, target, board, score, won}});
 
   const doMove = (dir: 'L' | 'R' | 'U' | 'D') => {
     if (end || wonBanner) return;
@@ -2471,7 +2474,7 @@ function Game2048({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMe
     if (!won && G2048.hasWon(r.board, target)) { setWon(true); setWonBanner(true); return; }
     if (!G2048.canMove(r.board, size)) {
       onDelete(RESUME_KEY); // game over — drop the stale resume
-      setEnd({msg: `No moves left — top tile ${nm}, score ${fs} 😅`});
+      setEnd({msg: tr('No moves left — top tile {t}, score {s} 😅', {t: nm, s: fs})});
     }
   };
 
@@ -2495,11 +2498,11 @@ function Game2048({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMe
   return (
     <View style={s.container}>
       <GameHeader title="2048" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={reset} />
-      <Text style={s.tttLegend}>Goal: make a <Text style={s.bold}>{target}</Text> tile · merge equal tiles (2+2→4)</Text>
+      <Text style={s.tttLegend}>{tr('Goal: make a')} <Text style={s.bold}>{target}</Text> {tr('tile · merge equal tiles (2+2→4)')}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>
-          {end ? null : <Text style={s.statusBig}>Top tile {mx} → goal {target} · score {score}{st.showBest && best != null ? ` · record ${best}` : ''}</Text>}
+          {end ? null : <Text style={s.statusBig}>{tr('Top tile {t} → goal {g} · score {s}', {t: mx, g: target, s: score})}{st.showBest && best != null ? ' · ' + tr('record {v}', {v: best}) : ''}</Text>}
         </View>
 
         <View style={{position: 'relative', alignSelf: 'center'}} {...pan.panHandlers}>
@@ -2520,12 +2523,12 @@ function Game2048({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMe
               </View>
             ))}
           </View>
-          {end ? <EndOverlay text={end.msg} /> : wonBanner ? <EndOverlay text={`You made the ${target} tile! 🎉`} /> : null}
+          {end ? <EndOverlay text={end.msg} /> : wonBanner ? <EndOverlay text={tr('You made the {t} tile! 🎉', {t: target})} /> : null}
         </View>
 
         <View style={s.padArea}>
-          {end ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>New game ▸</Text></Pressable>
-            : wonBanner ? <Pressable style={s.playAgainBtn} onPress={() => setWonBanner(false)}><Text style={s.playText}>Keep going ▸</Text></Pressable>
+          {end ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable>
+            : wonBanner ? <Pressable style={s.playAgainBtn} onPress={() => setWonBanner(false)}><Text style={s.playText}>{tr('Keep going ▸')}</Text></Pressable>
             : (
               <>
                 <Pressable onPress={() => doMove('U')} style={s.padBtn}><Text style={s.padTxt}>↑</Text></Pressable>
@@ -2611,8 +2614,8 @@ function Taquin({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMenu
     if (solved) return;
     const cap = size <= 3 ? 45000 : 2500, w = size <= 3 ? 2 : 3;
     const pos = TAQUIN.solveNext(board, size, cap, w);
-    if (pos >= 0) { setHintPos(pos); setFlash('💡 Tap the framed tile'); }
-    else { setHintPos(null); setFlash('💡 ' + TAQ_TIPS[tipRef.current++ % TAQ_TIPS.length]); }
+    if (pos >= 0) { setHintPos(pos); setFlash(tr('💡 Tap the framed tile')); }
+    else { setHintPos(null); setFlash('💡 ' + tr(TAQ_TIPS[tipRef.current++ % TAQ_TIPS.length])); }
   };
   const loadSave = (sv: GameSave) => {
     const d = sv.data || {};
@@ -2622,8 +2625,8 @@ function Taquin({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMenu
     if (Array.isArray(d.picRows)) setPicRows(d.picRows.slice());
     setShowSaved(false);
   };
-  useResume(() => resumeSave('taquin', diff, moves > 0 && !solved, `${size}×${size} · ${moves} moves`, {size, board, moves, imgMode, picRows}));
-  const saveNow = () => onSave({game: 'taquin', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `${size}×${size} · ${moves} moves`, data: {size, board, moves, imgMode, picRows}});
+  useResume(() => resumeSave('taquin', diff, moves > 0 && !solved, `${size}×${size} · ` + tr('{n} moves', {n: moves}), {size, board, moves, imgMode, picRows}));
+  const saveNow = () => onSave({game: 'taquin', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `${size}×${size} · ` + tr('{n} moves', {n: moves}), data: {size, board, moves, imgMode, picRows}});
   const tap = (i: number) => {
     if (solved) return;
     const nb = TAQUIN.slide(board, size, i);
@@ -2655,16 +2658,16 @@ function Taquin({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMenu
       <GameHeader title="15-Puzzle" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={reset} />
 
       <View style={s.taqControls}>
-        <Text style={s.memCardsLbl}>Tiles</Text>
-        <Pressable onPress={() => setImgMode('num')} style={[s.segBtn, imgMode === 'num' && s.segOn]}><Text style={[s.segTxt, imgMode === 'num' && s.solidText]}>Numbers</Text></Pressable>
-        <Pressable onPress={() => setImgMode('pic')} style={[s.segBtn, imgMode === 'pic' && s.segOn]}><Text style={[s.segTxt, imgMode === 'pic' && s.solidText]}>Picture</Text></Pressable>
-        {imgMode === 'pic' ? <Pressable onPress={() => setShowTarget(t => !t)} style={[s.segBtn, showTarget && s.segOn]}><Text style={[s.segTxt, showTarget && s.solidText]}>{showTarget ? 'Target: on' : 'Target: off'}</Text></Pressable> : null}
-        <Pressable onPress={hint} style={s.segBtn}><Text style={s.segTxt}>💡 Hint</Text></Pressable>
+        <Text style={s.memCardsLbl}>{tr('Tiles')}</Text>
+        <Pressable onPress={() => setImgMode('num')} style={[s.segBtn, imgMode === 'num' && s.segOn]}><Text style={[s.segTxt, imgMode === 'num' && s.solidText]}>{tr('Numbers')}</Text></Pressable>
+        <Pressable onPress={() => setImgMode('pic')} style={[s.segBtn, imgMode === 'pic' && s.segOn]}><Text style={[s.segTxt, imgMode === 'pic' && s.solidText]}>{tr('Picture')}</Text></Pressable>
+        {imgMode === 'pic' ? <Pressable onPress={() => setShowTarget(t => !t)} style={[s.segBtn, showTarget && s.segOn]}><Text style={[s.segTxt, showTarget && s.solidText]}>{showTarget ? tr('Target: on') : tr('Target: off')}</Text></Pressable> : null}
+        <Pressable onPress={hint} style={s.segBtn}><Text style={s.segTxt}>{tr('💡 Hint')}</Text></Pressable>
       </View>
 
       <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
         <View style={s.msgZone}>
-          {solved ? null : <Text style={s.statusBig}>{flash || `Moves ${moves}${st.showBest && best != null ? ` · Best ${best}` : ''}`}</Text>}
+          {solved ? null : <Text style={s.statusBig}>{flash || tr('Moves {n}', {n: moves}) + (st.showBest && best != null ? ' · ' + tr('Best {v}', {v: best}) : '')}</Text>}
         </View>
 
         <View style={{flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 14}}>
@@ -2692,20 +2695,20 @@ function Taquin({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; onMenu
                 </View>
               ))}
             </View>
-            {solved ? <EndOverlay text={`Solved in ${moves}! 🎉`} /> : null}
+            {solved ? <EndOverlay text={tr('Solved in {n}! 🎉', {n: moves})} /> : null}
           </View>
 
           {imgMode === 'pic' && showTarget && !solved ? (
             <View style={{alignItems: 'center'}}>
-              <Text style={s.bsLabel}>Target</Text>
+              <Text style={s.bsLabel}>{tr('Target')}</Text>
               <View style={{borderWidth: 2, borderColor: INK}}><TargetPic rows={picRows} size={size} box={Math.min(120, size * CELL * 0.5)} /></View>
-              <Pressable onPress={reset} style={[s.segBtn, {marginTop: 8, paddingVertical: 7}]}><Text style={s.segTxt}>🔀 New picture</Text></Pressable>
+              <Pressable onPress={reset} style={[s.segBtn, {marginTop: 8, paddingVertical: 7}]}><Text style={s.segTxt}>{tr('🔀 New picture')}</Text></Pressable>
             </View>
           ) : null}
         </View>
 
         <View style={s.belowZone}>
-          {solved ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>New game ▸</Text></Pressable> : null}
+          {solved ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable> : null}
         </View>
       </View>
 
@@ -2734,8 +2737,8 @@ function Mastermind({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; on
     setCode(d.code.slice()); setRows(Array.isArray(d.rows) ? d.rows : []); setCur(Array.isArray(d.cur) ? d.cur : []);
     setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('mm', diff, rows.length > 0 && !end, `${rows.length} guess${rows.length === 1 ? '' : 'es'} played`, {code, rows, cur}));
-  const saveNow = () => onSave({game: 'mm', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `${rows.length} guess${rows.length === 1 ? '' : 'es'} played`, data: {code, rows, cur}});
+  useResume(() => resumeSave('mm', diff, rows.length > 0 && !end, (rows.length === 1 ? tr('1 guess played') : tr('{n} guesses played', {n: rows.length})), {code, rows, cur}));
+  const saveNow = () => onSave({game: 'mm', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: (rows.length === 1 ? tr('1 guess played') : tr('{n} guesses played', {n: rows.length})), data: {code, rows, cur}});
   const place = (sym: number) => { if (end || cur.length >= cfg.pegs) return; setCur([...cur, sym]); };
   const back = () => { if (end) return; setCur(cur.slice(0, -1)); };
   const submit = () => {
@@ -2746,8 +2749,8 @@ function Mastermind({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; on
     if (sc.black === cfg.pegs) {
       const g = nrows.length, isBest = best == null || g < best;
       st.record('mm', diff, g); onDelete(RESUME_KEY);
-      setEnd({msg: st.showBest && isBest ? `Cracked in ${g} — new best! 🏆` : `Code cracked in ${g}! 🎉`, win: true});
-    } else if (nrows.length >= cfg.guesses) { onDelete(RESUME_KEY); setEnd({msg: 'Out of tries 😅', win: false}); }
+      setEnd({msg: st.showBest && isBest ? tr('Cracked in {n} — new best! 🏆', {n: g}) : tr('Code cracked in {n}! 🎉', {n: g}), win: true});
+    } else if (nrows.length >= cfg.guesses) { onDelete(RESUME_KEY); setEnd({msg: tr('Out of tries 😅'), win: false}); }
   };
 
   const easy = diff === 'easy';
@@ -2784,7 +2787,7 @@ function Mastermind({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; on
   return (
     <View style={s.container}>
       <GameHeader title="Mastermind" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={reset} />
-      <Text style={s.tttLegend}>{cfg.pegs} pegs · {cfg.symbols} numbers · {end ? (end.win ? 'solved' : 'revealed below') : `${triesLeft} of ${cfg.guesses} tries left`}{st.showBest && best != null ? ` · best ${best}` : ''} · ● right spot · ○ right number{easy ? ' · – absent' : ''}</Text>
+      <Text style={s.tttLegend}>{tr('{p} pegs · {s} numbers', {p: cfg.pegs, s: cfg.symbols})} · {end ? (end.win ? tr('solved') : tr('revealed below')) : tr('{n} of {t} tries left', {n: triesLeft, t: cfg.guesses})}{st.showBest && best != null ? ' · ' + tr('best {v}', {v: best}) : ''} · {tr('● right spot · ○ right number')}{easy ? ' · ' + tr('– absent') : ''}</Text>
 
       <View style={{flex: 1, position: 'relative'}}>
         <ScrollView style={{flex: 1}} contentContainerStyle={{paddingVertical: 8, alignItems: 'center', flexGrow: 1, justifyContent: 'center'}}>
@@ -2819,7 +2822,7 @@ function Mastermind({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; on
             <View style={[s.mmRow, {opacity: 0.9}]}>
               <Text style={s.mmRowNum}>✓</Text>
               <View style={{flexDirection: 'row', gap: 6}}>{code.map((g, gi) => pegView(g, gi))}</View>
-              <Text style={{fontWeight: '700', color: INK}}>the code</Text>
+              <Text style={{fontWeight: '700', color: INK}}>{tr('the code')}</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -2843,11 +2846,11 @@ function Mastermind({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; on
             ))}
           </View>
           <Pressable onPress={submit} style={[s.playBtn, cur.length !== cfg.pegs && s.mmSubmitOff, {marginTop: 10}]}>
-            <Text style={s.playText}>Submit guess ▸</Text>
+            <Text style={s.playText}>{tr('Submit guess ▸')}</Text>
           </Pressable>
         </View>
         </View>
-        {end ? <View style={[StyleSheet.absoluteFill, {alignItems: 'center', justifyContent: 'center'}]}><Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>New game ▸</Text></Pressable></View> : null}
+        {end ? <View style={[StyleSheet.absoluteFill, {alignItems: 'center', justifyContent: 'center'}]}><Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable></View> : null}
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -2874,8 +2877,8 @@ function PegSolitaire({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; 
     if (!Array.isArray(d.pegs) || d.pegs.length !== PEG.initPegs(spec).length) return; // wrong board — ignore
     setPegs(d.pegs.slice()); setHist(Array.isArray(d.hist) ? d.hist : []); setSel(null); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('peg', diff, hist.length > 0 && !end, `${PEG.pegCount(pegs)} pegs left`, {pegs, hist}));
-  const saveNow = () => onSave({game: 'peg', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `${PEG.pegCount(pegs)} pegs left`, data: {pegs, hist}});
+  useResume(() => resumeSave('peg', diff, hist.length > 0 && !end, tr('{n} pegs left', {n: PEG.pegCount(pegs)}), {pegs, hist}));
+  const saveNow = () => onSave({game: 'peg', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: tr('{n} pegs left', {n: PEG.pegCount(pegs)}), data: {pegs, hist}});
   const undo = () => { if (!hist.length) return; setPegs(hist[hist.length - 1]); setHist(hist.slice(0, -1)); setSel(null); setEnd(null); };
 
   const count = PEG.pegCount(pegs);
@@ -2893,7 +2896,7 @@ function PegSolitaire({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; 
         const pc = PEG.pegCount(np);
         const isBest = best == null || pc < best;
         st.record('peg', diff, pc); onDelete(RESUME_KEY);
-        setEnd({msg: pc === 1 ? 'Perfect — one peg left! 🎉' : (st.showBest && isBest ? `${pc} pegs left — new best! 🏆` : `${pc} pegs left — try again`)});
+        setEnd({msg: pc === 1 ? tr('Perfect — one peg left! 🎉') : (st.showBest && isBest ? tr('{n} pegs left — new best! 🏆', {n: pc}) : tr('{n} pegs left — try again', {n: pc}))});
       }
     }
   };
@@ -2913,11 +2916,11 @@ function PegSolitaire({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; 
   return (
     <View style={s.container}>
       <GameHeader title="Peg Solitaire" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={reset} />
-      <Text style={s.tttLegend}>{spec.name} · clear down to a single peg</Text>
+      <Text style={s.tttLegend}>{tr(spec.name)} · {tr('clear down to a single peg')}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>
-          {end ? null : <Text style={s.statusBig}>Pegs left: {count}{st.showBest && best != null ? ` · Best ${best}` : ''}</Text>}
+          {end ? null : <Text style={s.statusBig}>{tr('Pegs left: {n}', {n: count})}{st.showBest && best != null ? ' · ' + tr('Best {v}', {v: best}) : ''}</Text>}
         </View>
 
         <View style={{position: 'relative', alignSelf: 'center'}}>
@@ -2942,8 +2945,8 @@ function PegSolitaire({diff, onMenu, st, saves, onSave, onDelete}: {diff: Diff; 
 
         <View style={s.belowZone}>
           {end
-            ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>New game ▸</Text></Pressable>
-            : (hist.length ? <Pressable style={s.undoBtn} onPress={undo}><Text style={s.undoTxt}>↩ Undo</Text></Pressable> : null)}
+            ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable>
+            : (hist.length ? <Pressable style={s.undoBtn} onPress={undo}><Text style={s.undoTxt}>{tr('↩ Undo')}</Text></Pressable> : null)}
         </View>
       </View>
 
@@ -2986,7 +2989,7 @@ function Memory({diff, onMenu, st, names, emojis, players: propPlayers, saves, o
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : `Player ${i + 1}`;
+  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : tr('Player {n}', {n: i + 1});
   const reset = () => {
     if (timer.current) clearTimeout(timer.current);
     setBoard(makeMemBoard(diff));
@@ -3001,14 +3004,14 @@ function Memory({diff, onMenu, st, names, emojis, players: propPlayers, saves, o
     setTurn(d.turn || 0); setFlips(d.flips || 0); if (d.cardSet) setCardSet(d.cardSet);
     setFirst(null); setSecond(null); setLock(false); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('memory', diff, !end && (flips > 0 || board.matched.some(Boolean)), `${Math.floor(board.matched.filter(Boolean).length / 2)}/${board.pairs} pairs`, {values: board.values, matched: board.matched, pairs: board.pairs, scores, turn, flips, cardSet}));
-  const saveNow = () => onSave({game: 'memory', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: `${Math.floor(board.matched.filter(Boolean).length / 2)}/${board.pairs} pairs`, data: {values: board.values, matched: board.matched, pairs: board.pairs, scores, turn, flips, cardSet}});
+  useResume(() => resumeSave('memory', diff, !end && (flips > 0 || board.matched.some(Boolean)), tr('{n}/{t} pairs', {n: Math.floor(board.matched.filter(Boolean).length / 2), t: board.pairs}), {values: board.values, matched: board.matched, pairs: board.pairs, scores, turn, flips, cardSet}));
+  const saveNow = () => onSave({game: 'memory', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: tr('{n}/{t} pairs', {n: Math.floor(board.matched.filter(Boolean).length / 2), t: board.pairs}), data: {values: board.values, matched: board.matched, pairs: board.pairs, scores, turn, flips, cardSet}});
 
   const winnerMsg = (fs: number[]) => {
-    if (players === 1) return `All ${board.pairs} pairs in ${flips + 1} flips! 🎉`;
+    if (players === 1) return tr('All {n} pairs in {f} flips! 🎉', {n: board.pairs, f: flips + 1});
     let max = -1; fs.forEach(v => { if (v > max) max = v; });
     const winners = fs.map((v, i) => (v === max ? i : -1)).filter(i => i >= 0);
-    return winners.length > 1 ? `It's a tie — ${max} pairs each!` : `${tokenFor(winners[0] + 1)} ${nameFor(winners[0])} wins with ${max}! 🎉`;
+    return winners.length > 1 ? tr("It's a tie — {n} pairs each!", {n: max}) : tr('{name} wins with {n}! 🎉', {name: `${tokenFor(winners[0] + 1)} ${nameFor(winners[0])}`, n: max});
   };
 
   const tap = (i: number) => {
@@ -3035,7 +3038,7 @@ function Memory({diff, onMenu, st, names, emojis, players: propPlayers, saves, o
   const matchedPairs = board.matched.filter(Boolean).length / 2;
   const CELL = fitCell(board.cols, board.rows, 300, 120);
   const tokenFor = (p1based: number) => (emojis && (emojis as any)['p' + p1based]) || String(p1based);
-  const status = players === 1 ? `Pairs ${matchedPairs}/${board.pairs} · flips ${flips}${st.showBest && best != null ? ` · Best ${best}` : ''}` : `${tokenFor(turn + 1)} ${nameFor(turn)}'s turn`;
+  const status = players === 1 ? tr('Pairs {n}/{t} · flips {f}', {n: matchedPairs, t: board.pairs, f: flips}) + (st.showBest && best != null ? ' · ' + tr('Best {v}', {v: best}) : '') : tr("{name}'s turn", {name: `${tokenFor(turn + 1)} ${nameFor(turn)}`});
 
   return (
     <View style={s.container}>
@@ -3043,9 +3046,9 @@ function Memory({diff, onMenu, st, names, emojis, players: propPlayers, saves, o
 
       <View style={s.memCardsRow}>
         {players > 1 ? <Text style={[s.tttLegend, {flex: 1}]} numberOfLines={1}>{Array.from({length: players}).map((_, i) => `${tokenFor(i + 1)} ${nameFor(i)}`).join(' · ')}</Text> : <View style={{flex: 1}} />}
-        <Text style={s.memCardsLbl}>Cards</Text>
-        <Pressable onPress={() => setCardSet('num')} style={[s.segBtn, cardSet === 'num' && s.segOn]}><Text style={[s.segTxt, cardSet === 'num' && s.solidText]}>Numbers</Text></Pressable>
-        <Pressable onPress={() => setCardSet('pic')} style={[s.segBtn, cardSet === 'pic' && s.segOn]}><Text style={[s.segTxt, cardSet === 'pic' && s.solidText]}>Picture</Text></Pressable>
+        <Text style={s.memCardsLbl}>{tr('Cards')}</Text>
+        <Pressable onPress={() => setCardSet('num')} style={[s.segBtn, cardSet === 'num' && s.segOn]}><Text style={[s.segTxt, cardSet === 'num' && s.solidText]}>{tr('Numbers')}</Text></Pressable>
+        <Pressable onPress={() => setCardSet('pic')} style={[s.segBtn, cardSet === 'pic' && s.segOn]}><Text style={[s.segTxt, cardSet === 'pic' && s.solidText]}>{tr('Picture')}</Text></Pressable>
       </View>
 
       <View style={s.centerArea}>
@@ -3081,7 +3084,7 @@ function Memory({diff, onMenu, st, names, emojis, players: propPlayers, saves, o
 
         <View style={s.belowZone}>
           {end
-            ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>New game ▸</Text></Pressable>
+            ? <Pressable style={s.playAgainBtn} onPress={reset}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable>
             : (players > 1 ? (
               <View style={s.memScoreRow}>
                 {scores.map((sc, i) => (
@@ -3119,7 +3122,7 @@ function Chess({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
   const idx = useRef({win: 0, lose: 0});
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const nameFor = (whiteSide: boolean) => twoP ? ((emojis && (emojis as any)[whiteSide ? 'p1' : 'p2'] ? (emojis as any)[whiteSide ? 'p1' : 'p2'] + ' ' : '') + (whiteSide ? p1 : p2)) : (whiteSide ? 'You' : 'SuperFun');
+  const nameFor = (whiteSide: boolean) => twoP ? ((emojis && (emojis as any)[whiteSide ? 'p1' : 'p2'] ? (emojis as any)[whiteSide ? 'p1' : 'p2'] + ' ' : '') + (whiteSide ? p1 : p2)) : (whiteSide ? tr('You') : 'SuperFun');
   const moves = useMemo(() => (!busy && !end) ? CHESS.legalMoves(st) : [], [st, busy, end]);
   const selMoves = sel !== null ? moves.filter((m: any) => m.from === sel) : [];
   const dests = new Set<number>(selMoves.map((m: any) => m.to));
@@ -3131,8 +3134,8 @@ function Chess({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
     if (!r.over) return false;
     onDelete(RESUME_KEY);
     let msg: string;
-    if (r.reason === 'checkmate') msg = twoP ? `${nameFor(r.result === 'w')} wins — checkmate! 🎉` : (r.result === 'w' ? WIN_MSGS[idx.current.win++ % WIN_MSGS.length] : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]);
-    else msg = r.reason === 'stalemate' ? 'Stalemate — a draw.' : `Draw — ${r.reason}.`;
+    if (r.reason === 'checkmate') msg = twoP ? tr('{name} wins — checkmate! 🎉', {name: nameFor(r.result === 'w')}) : (r.result === 'w' ? tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]));
+    else msg = r.reason === 'stalemate' ? tr('Stalemate — a draw.') : tr('Draw — {why}.', {why: tr(r.reason)});
     setEnd({msg});
     return true;
   };
@@ -3172,18 +3175,18 @@ function Chess({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
   useResume(() => {
     const init = CHESS.initBoard().board;
     const started = st.board.some((v: string, k: number) => v !== init[k]);
-    return resumeSave('chess', diff, !end && !busy && started && (twoP || st.turn === 'w'), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board: st.board, turn: st.turn, castle: st.castle, ep: st.ep});
+    return resumeSave('chess', diff, !end && !busy && started && (twoP || st.turn === 'w'), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board: st.board, turn: st.turn, castle: st.castle, ep: st.ep});
   });
-  const saveNow = () => onSave({game: 'chess', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board: st.board, turn: st.turn, castle: st.castle, ep: st.ep}});
+  const saveNow = () => onSave({game: 'chess', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board: st.board, turn: st.turn, castle: st.castle, ep: st.ep}});
 
   const chk = !end && CHESS.inCheck(st, st.turn === 'w');
-  const status = end ? '' : busy ? 'SuperFun is thinking…' : `${nameFor(st.turn === 'w')}'s turn${chk ? ' — check!' : ''}`;
+  const status = end ? '' : busy ? tr('SuperFun is thinking…') : tr("{name}'s turn", {name: nameFor(st.turn === 'w')}) + (chk ? tr(' — check!') : '');
   const CELL = bigCell(8);
 
   return (
     <View style={s.container}>
       <GameHeader title="Chess" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
-      <Text style={s.tttLegend}>{twoP ? `${p1} = white ♙ · ${p2} = black ♟` : `You are white ♙ · SuperFun black ♟ · ${DIFFICULTIES[diff].label}`}</Text>
+      <Text style={s.tttLegend}>{twoP ? tr('{a} = white ♙ · {b} = black ♟', {a: p1, b: p2}) : tr('You are white ♙ · SuperFun black ♟ · {diff}', {diff: tr(DIFFICULTIES[diff].label)})}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>{end ? null : <Text style={twoP ? s.turnBig : s.statusBig}>{status}</Text>}</View>
@@ -3205,7 +3208,7 @@ function Chess({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
           </View>
           {end ? <EndOverlay text={end.msg} /> : null}
         </View>
-        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}</View>
+        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}</View>
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -3231,16 +3234,16 @@ function Reversi({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const c = REV.counts(board);
-  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? 'You' : 'SuperFun');
+  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? tr('You') : 'SuperFun');
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setBoard(REV.initBoard()); setTurn(1); setBusy(false); setEnd(null); };
 
   const finish = (nb: number[]) => {
     onDelete(RESUME_KEY);
     const cc = REV.counts(nb);
-    if (cc.p1 === cc.p2) { setEnd({msg: DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length]}); return; }
+    if (cc.p1 === cc.p2) { setEnd({msg: tr(DRAW_MSGS[idx.current.draw++ % DRAW_MSGS.length])}); return; }
     const p1won = cc.p1 > cc.p2;
-    if (twoP) setEnd({msg: `${p1won ? nameFor(1) : nameFor(2)} wins ${Math.max(cc.p1, cc.p2)}–${Math.min(cc.p1, cc.p2)}! 🎉`});
-    else setEnd({msg: p1won ? WIN_MSGS[idx.current.win++ % WIN_MSGS.length] : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]});
+    if (twoP) setEnd({msg: tr('{name} wins {score}! 🎉', {name: p1won ? nameFor(1) : nameFor(2), score: `${Math.max(cc.p1, cc.p2)}–${Math.min(cc.p1, cc.p2)}`})});
+    else setEnd({msg: p1won ? tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length])});
   };
   const nextTurn = (nb: number[], moved: number) => { const other = REV.opp(moved); return REV.legalMoves(nb, other).length ? other : moved; };
   const commit = (nb: number[], moved: number) => {
@@ -3274,10 +3277,10 @@ function Reversi({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {
     setBoard(nb); setTurn(t); setBusy(false); setEnd(null); setShowSaved(false);
     if (!twoP && t === 2 && !REV.isOver(nb)) aiRespond(nb); // solo game loaded on the AI's turn → let it move
   };
-  useResume(() => resumeSave('reversi', diff, !end && !busy && (c.p1 + c.p2) > 4 && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board, turn}));
-  const saveNow = () => onSave({game: 'reversi', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board, turn}});
+  useResume(() => resumeSave('reversi', diff, !end && !busy && (c.p1 + c.p2) > 4 && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board, turn}));
+  const saveNow = () => onSave({game: 'reversi', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board, turn}});
   const legal = useMemo(() => (!busy && !end) ? new Set(REV.legalMoves(board, turn)) : new Set<number>(), [board, turn, busy, end]);
-  const status = end ? '' : busy ? 'SuperFun is thinking…' : (twoP ? `${nameFor(turn)}'s turn (${turn === 1 ? '●' : '○'})` : 'Your turn');
+  const status = end ? '' : busy ? tr('SuperFun is thinking…') : (twoP ? tr("{name}'s turn ({mark})", {name: nameFor(turn), mark: turn === 1 ? '●' : '○'}) : tr('Your turn'));
   const CELL = bigCell(8);
 
   return (
@@ -3306,7 +3309,7 @@ function Reversi({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {
           </View>
           {end ? <EndOverlay text={end.msg} /> : null}
         </View>
-        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}</View>
+        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}</View>
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -3333,7 +3336,7 @@ function Checkers({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setBoard(CK.initBoard()); setTurn(1); setSel(null); setBusy(false); setEnd(null); };
-  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? 'You' : 'SuperFun');
+  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? tr('You') : 'SuperFun');
 
   const loadSave = (sv: GameSave) => {
     if (timer.current) clearTimeout(timer.current);
@@ -3343,8 +3346,8 @@ function Checkers({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: 
     setBoard(nb); setTurn(t); setSel(null); setBusy(false); setEnd(null); setShowSaved(false);
     if (!twoP && t === 2) aiRespond(nb); // solo game loaded on the AI's turn → let it move
   };
-  useResume(() => { const init = CK.initBoard(); const started = board.some((v, i) => v !== init[i]); return resumeSave('checkers', diff, !end && !busy && started && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board, turn}); });
-  const saveNow = () => onSave({game: 'checkers', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board, turn}});
+  useResume(() => { const init = CK.initBoard(); const started = board.some((v, i) => v !== init[i]); return resumeSave('checkers', diff, !end && !busy && started && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board, turn}); });
+  const saveNow = () => onSave({game: 'checkers', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board, turn}});
   const moves = useMemo(() => (!busy && !end) ? CK.legalMoves(board, turn) : [], [board, turn, busy, end]);
   const movable = new Set(moves.map((m: any) => m.from));
   const selMoves = sel !== null ? moves.filter((m: any) => m.from === sel) : [];
@@ -3352,8 +3355,8 @@ function Checkers({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: 
 
   const finishWin = (winner: number) => {
     onDelete(RESUME_KEY);
-    if (twoP) setEnd({msg: `${nameFor(winner)} wins! 🎉`});
-    else setEnd({msg: winner === 1 ? WIN_MSGS[idx.current.win++ % WIN_MSGS.length] : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]});
+    if (twoP) setEnd({msg: tr('{name} wins! 🎉', {name: nameFor(winner)})});
+    else setEnd({msg: winner === 1 ? tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length])});
   };
   const commit = (nb: number[], moved: number) => {
     setBoard(nb); setSel(null);
@@ -3380,13 +3383,13 @@ function Checkers({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: 
     }
   };
 
-  const status = end ? '' : busy ? 'SuperFun is thinking…' : (twoP ? `${nameFor(turn)}'s turn (${turn === 1 ? '●' : '○'})` : 'Your turn');
+  const status = end ? '' : busy ? tr('SuperFun is thinking…') : (twoP ? tr("{name}'s turn ({mark})", {name: nameFor(turn), mark: turn === 1 ? '●' : '○'}) : tr('Your turn'));
   const CELL = bigCell(8);
 
   return (
     <View style={s.container}>
       <GameHeader title="Checkers" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
-      <Text style={s.tttLegend}>{nameFor(1)} = <Text style={s.bold}>●</Text> · {nameFor(2)} = <Text style={s.bold}>○</Text> · captures are forced</Text>
+      <Text style={s.tttLegend}>{nameFor(1)} = <Text style={s.bold}>●</Text> · {nameFor(2)} = <Text style={s.bold}>○</Text> · {tr('captures are forced')}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>{end ? null : <Text style={twoP ? s.turnBig : s.statusBig}>{status}</Text>}</View>
@@ -3414,7 +3417,7 @@ function Checkers({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: 
           </View>
           {end ? <EndOverlay text={end.msg} /> : null}
         </View>
-        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}</View>
+        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}</View>
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -3441,7 +3444,7 @@ function Dames({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setBoard(DAMES.initBoard()); setTurn(1); setSel(null); setBusy(false); setEnd(null); };
-  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? 'You' : 'SuperFun');
+  const nameFor = (p: number) => twoP ? ((emojis && (emojis as any)['p' + p] ? (emojis as any)['p' + p] + ' ' : '') + (p === 1 ? p1 : p2)) : (p === 1 ? tr('You') : 'SuperFun');
 
   const loadSave = (sv: GameSave) => {
     if (timer.current) clearTimeout(timer.current);
@@ -3451,8 +3454,8 @@ function Dames({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
     setBoard(nb); setTurn(t); setSel(null); setBusy(false); setEnd(null); setShowSaved(false);
     if (!twoP && t === 2) aiRespond(nb); // solo game loaded on the AI's turn → let it move
   };
-  useResume(() => { const init = DAMES.initBoard(); const started = board.some((v, i) => v !== init[i]); return resumeSave('dames', diff, !end && !busy && started && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, {board, turn}); });
-  const saveNow = () => onSave({game: 'dames', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {board, turn}});
+  useResume(() => { const init = DAMES.initBoard(); const started = board.some((v, i) => v !== init[i]); return resumeSave('dames', diff, !end && !busy && started && (twoP || turn === 1), twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {board, turn}); });
+  const saveNow = () => onSave({game: 'dames', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: twoP ? `${p1} vs ${p2}` : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {board, turn}});
   const moves = useMemo(() => (!busy && !end) ? DAMES.legalMoves(board, turn) : [], [board, turn, busy, end]);
   const movable = new Set(moves.map((m: any) => m.from));
   const selMoves = sel !== null ? moves.filter((m: any) => m.from === sel) : [];
@@ -3460,8 +3463,8 @@ function Dames({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
 
   const finishWin = (winner: number) => {
     onDelete(RESUME_KEY);
-    if (twoP) setEnd({msg: `${nameFor(winner)} wins! 🎉`});
-    else setEnd({msg: winner === 1 ? WIN_MSGS[idx.current.win++ % WIN_MSGS.length] : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]});
+    if (twoP) setEnd({msg: tr('{name} wins! 🎉', {name: nameFor(winner)})});
+    else setEnd({msg: winner === 1 ? tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length])});
   };
   const commit = (nb: number[], moved: number) => {
     setBoard(nb); setSel(null);
@@ -3488,13 +3491,13 @@ function Dames({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
     }
   };
 
-  const status = end ? '' : busy ? 'SuperFun is thinking…' : (twoP ? `${nameFor(turn)}'s turn (${turn === 1 ? '●' : '○'})` : 'Your turn');
+  const status = end ? '' : busy ? tr('SuperFun is thinking…') : (twoP ? tr("{name}'s turn ({mark})", {name: nameFor(turn), mark: turn === 1 ? '●' : '○'}) : tr('Your turn'));
   const CELL = bigCell(10);
 
   return (
     <View style={s.container}>
       <GameHeader title="Dames" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
-      <Text style={s.tttLegend}>{nameFor(1)} = <Text style={s.bold}>●</Text> · {nameFor(2)} = <Text style={s.bold}>○</Text> · take the most captures</Text>
+      <Text style={s.tttLegend}>{nameFor(1)} = <Text style={s.bold}>●</Text> · {nameFor(2)} = <Text style={s.bold}>○</Text> · {tr('take the most captures')}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>{end ? null : <Text style={twoP ? s.turnBig : s.statusBig}>{status}</Text>}</View>
@@ -3522,7 +3525,7 @@ function Dames({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}: {di
           </View>
           {end ? <EndOverlay text={end.msg} /> : null}
         </View>
-        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable> : null}</View>
+        <View style={s.belowZone}>{end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable> : null}</View>
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -3548,7 +3551,7 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
 
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setSt(DOTS.initState(R, C)); setTurn(1); setBusy(false); setEnd(null); };
 
-  const nameFor = (p: number) => isAI ? (p === 1 ? 'You' : 'SuperFun') : ((names as any)['p' + p] || `Player ${p}`);
+  const nameFor = (p: number) => isAI ? (p === 1 ? tr('You') : 'SuperFun') : ((names as any)['p' + p] || tr('Player {n}', {n: p}));
   const initial = (p: number) => isAI ? (p === 1 ? 'Y' : 'S') : nameFor(p).charAt(0).toUpperCase();
   // If two players share an initial, fall back to their number; also tint each owner's box differently.
   const marks = Array.from({length: players}, (_, i) => initial(i + 1));
@@ -3562,15 +3565,15 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
     const s2 = DOTS.scores(state) as {[k: number]: number};
     if (isAI) {
       const a = s2[1] || 0, b = s2[2] || 0;
-      if (a === b) setEnd({msg: `It's a tie — ${a} each!`});
-      else setEnd({msg: a > b ? WIN_MSGS[idx.current.win++ % WIN_MSGS.length] : LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length]});
+      if (a === b) setEnd({msg: tr("It's a tie — {n} each!", {n: a})});
+      else setEnd({msg: a > b ? tr(WIN_MSGS[idx.current.win++ % WIN_MSGS.length]) : tr(LOSE_MSGS[idx.current.lose++ % LOSE_MSGS.length])});
       return;
     }
     let max = -1;
     for (let p = 1; p <= players; p++) { const v = s2[p] || 0; if (v > max) max = v; }
     const winners: number[] = [];
     for (let p = 1; p <= players; p++) if ((s2[p] || 0) === max) winners.push(p);
-    setEnd({msg: winners.length > 1 ? `It's a tie — ${max} each!` : `${emj(winners[0]) || boxMark(winners[0])} ${nameFor(winners[0])} wins with ${max}! 🎉`});
+    setEnd({msg: winners.length > 1 ? tr("It's a tie — {n} each!", {n: max}) : tr('{name} wins with {n}! 🎉', {name: `${emj(winners[0]) || boxMark(winners[0])} ${nameFor(winners[0])}`, n: max})});
   };
   const scheduleAI = (state: any) => {
     setBusy(true);
@@ -3586,8 +3589,8 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
     if (!d.st || d.R !== R || d.C !== C) return;
     setSt(DOTS.clone(d.st)); setTurn(d.turn || 1); setBusy(false); setEnd(null); setShowSaved(false);
   };
-  useResume(() => { const fresh = JSON.stringify(st) === JSON.stringify(DOTS.initState(R, C)); return resumeSave('dots', diff, !end && !busy && !fresh && (!isAI || turn === 1), isAI ? `vs SuperFun (${DIFFICULTIES[diff].label})` : `${players} players`, {st, turn, R, C}); });
-  const saveNow = () => onSave({game: 'dots', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: isAI ? `vs SuperFun (${DIFFICULTIES[diff].label})` : `${players} players`, data: {st, turn, R, C}});
+  useResume(() => { const fresh = JSON.stringify(st) === JSON.stringify(DOTS.initState(R, C)); return resumeSave('dots', diff, !end && !busy && !fresh && (!isAI || turn === 1), isAI ? tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}) : tr('{n} players', {n: players}), {st, turn, R, C}); });
+  const saveNow = () => onSave({game: 'dots', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: isAI ? tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}) : tr('{n} players', {n: players}), data: {st, turn, R, C}});
   const play = (kind: string, i: number, by: number, base: any = st) => {
     const ns = DOTS.clone(base);
     const done = DOTS.applyEdge(ns, kind, i, by);
@@ -3605,7 +3608,7 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
     play(kind, i, turn);
   };
 
-  const status = end ? '' : busy ? 'SuperFun is thinking…' : (multi ? `${emj(turn) ? emj(turn) + ' ' : ''}${nameFor(turn)}'s turn` : `${nameFor(turn)}'s turn · ${sc[1] || 0}–${sc[2] || 0}`);
+  const status = end ? '' : busy ? tr('SuperFun is thinking…') : (multi ? tr("{name}'s turn", {name: `${emj(turn) ? emj(turn) + ' ' : ''}${nameFor(turn)}`}) : tr("{name}'s turn", {name: nameFor(turn)}) + ` · ${sc[1] || 0}–${sc[2] || 0}`);
   const EDGE = 14;
   const avail = Math.min(SCREEN_W - 24, 460);
   const cellLen = Math.max(26, Math.floor((avail - (C + 1) * EDGE) / C));
@@ -3615,7 +3618,7 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
     <View style={s.container}>
       <GameHeader title="Dots & Boxes" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
 
-      <Text style={s.tttLegend}>{multi ? Array.from({length: players}).map((_, i) => `${nameFor(i + 1)} (${boxMark(i + 1)})`).join(' · ') : `${nameFor(1)} (${boxMark(1)}) vs ${nameFor(2)} (${boxMark(2)})`} · close a box to go again</Text>
+      <Text style={s.tttLegend}>{multi ? Array.from({length: players}).map((_, i) => `${nameFor(i + 1)} (${boxMark(i + 1)})`).join(' · ') : `${nameFor(1)} (${boxMark(1)}) vs ${nameFor(2)} (${boxMark(2)})`} · {tr('close a box to go again')}</Text>
 
       <View style={s.centerArea}>
         <View style={s.msgZone}>{end ? null : <Text style={!isAI ? s.turnBig : s.statusBig}>{status}</Text>}</View>
@@ -3644,7 +3647,7 @@ function DotsBoxes({diff, mode, names, emojis, onMenu, players: propPlayers, sav
         </View>
         <View style={s.belowZone}>
           {end
-            ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable>
+            ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable>
             : (multi ? (
               <View style={s.memScoreRow}>
                 {Array.from({length: players}).map((_, i) => (
@@ -3698,7 +3701,7 @@ function Dice({onMenu}: {onMenu: () => void}): React.JSX.Element {
       <GameHeader title="Dice Roller" onMenu={onMenu} onRules={() => setRules(true)} />
 
       <View style={s.diceCountRow}>
-        <Text style={s.memCardsLbl}>Dice</Text>
+        <Text style={s.memCardsLbl}>{tr('Dice')}</Text>
         {[1, 2, 3, 4, 5, 6].map(c => (
           <Pressable key={c} onPress={() => setCount(c)} style={[s.segBtn, n === c && s.segOn]}>
             <Text style={[s.segTxt, n === c && s.solidText]}>{c}</Text>
@@ -3710,9 +3713,9 @@ function Dice({onMenu}: {onMenu: () => void}): React.JSX.Element {
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 14, maxWidth: SCREEN_W - 30}}>
           {vals.map((v, i) => <DieFace key={i} n={v} size={die} color={INK} />)}
         </View>
-        <Text style={s.diceTotal}>Total: {total}</Text>
+        <Text style={s.diceTotal}>{tr('Total: {n}', {n: total})}</Text>
         <Pressable style={[s.playBtn, {paddingHorizontal: 40}]} onPress={roll}>
-          <Text style={s.playText}>🎲 Roll{rolling ? '…' : ''}</Text>
+          <Text style={s.playText}>🎲 {tr('Roll')}{rolling ? '…' : ''}</Text>
         </Pressable>
       </View>
 
@@ -3735,7 +3738,7 @@ function Pig({onMenu, names, emojis, players: propPlayers, saves, onSave, onDele
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : `Player ${i + 1}`;
+  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : tr('Player {n}', {n: i + 1});
   const tokenFor = (p1based: number) => (emojis && (emojis as any)['p' + p1based]) || String(p1based);
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setScores(new Array(players).fill(0)); setTurn(0); setTurnTotal(0); setDie(1); setRolling(false); setMsg(''); setEnd(null); };
   const nextTurn = () => { setTurnTotal(0); setTurn(t => (t + 1) % players); };
@@ -3746,8 +3749,8 @@ function Pig({onMenu, names, emojis, players: propPlayers, saves, onSave, onDele
     if (!Array.isArray(d.scores) || d.scores.length !== players) return;
     setScores(d.scores.slice()); setTurn(d.turn || 0); setTurnTotal(d.turnTotal || 0); setDie(d.die || 1); setRolling(false); setMsg(''); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('pig', 'medium', !end && !rolling && (turnTotal > 0 || scores.some(v => v > 0)), `${players} players`, {scores, turn, turnTotal, die, players}));
-  const saveNow = () => onSave({game: 'pig', key: String(Date.now()).slice(-6), ts: Date.now(), diff: 'medium', label: `${players} players`, data: {scores, turn, turnTotal, die, players}});
+  useResume(() => resumeSave('pig', 'medium', !end && !rolling && (turnTotal > 0 || scores.some(v => v > 0)), tr('{n} players', {n: players}), {scores, turn, turnTotal, die, players}));
+  const saveNow = () => onSave({game: 'pig', key: String(Date.now()).slice(-6), ts: Date.now(), diff: 'medium', label: tr('{n} players', {n: players}), data: {scores, turn, turnTotal, die, players}});
 
   const roll = () => {
     if (rolling || end) return;
@@ -3755,14 +3758,14 @@ function Pig({onMenu, names, emojis, players: propPlayers, saves, onSave, onDele
     timer.current = setTimeout(() => {
       const d = 1 + Math.floor(Math.random() * 6);
       setDie(d); setRolling(false);
-      if (d === 1) { setMsg('Rolled a 1 — turn lost!'); nextTurn(); }
+      if (d === 1) { setMsg(tr('Rolled a 1 — turn lost!')); nextTurn(); }
       else setTurnTotal(t => t + d);
     }, 350);
   };
   const hold = () => {
     if (rolling || end || turnTotal === 0) return;
     const ns = scores.slice(); ns[turn] += turnTotal; setScores(ns);
-    if (ns[turn] >= TARGET) { onDelete(RESUME_KEY); setEnd({msg: `${tokenFor(turn + 1)} ${nameFor(turn)} wins with ${ns[turn]}! 🎉`}); return; }
+    if (ns[turn] >= TARGET) { onDelete(RESUME_KEY); setEnd({msg: tr('{name} wins with {n}! 🎉', {name: `${tokenFor(turn + 1)} ${nameFor(turn)}`, n: ns[turn]})}); return; }
     setMsg(''); nextTurn();
   };
 
@@ -3770,19 +3773,19 @@ function Pig({onMenu, names, emojis, players: propPlayers, saves, onSave, onDele
     <View style={s.container}>
       <GameHeader title="Pig" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
 
-      <Text style={s.tttLegend}>{Array.from({length: players}).map((_, i) => `${tokenFor(i + 1)} ${nameFor(i)}`).join(' · ')} · first to 100</Text>
+      <Text style={s.tttLegend}>{Array.from({length: players}).map((_, i) => `${tokenFor(i + 1)} ${nameFor(i)}`).join(' · ')} · {tr('first to 100')}</Text>
 
       <View style={{flex: 1, position: 'relative'}}>
         <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16}}>
-          <Text style={s.turnBig}>{end ? '' : (msg || `${tokenFor(turn + 1)} ${nameFor(turn)}'s turn`)}</Text>
+          <Text style={s.turnBig}>{end ? '' : (msg || tr("{name}'s turn", {name: `${tokenFor(turn + 1)} ${nameFor(turn)}`}))}</Text>
           <DieFace n={die} size={112} />
-          <Text style={s.pigTotal}>Turn total: {turnTotal}</Text>
+          <Text style={s.pigTotal}>{tr('Turn total: {n}', {n: turnTotal})}</Text>
           {end
-            ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>New game ▸</Text></Pressable>
+            ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable>
             : (
               <View style={{flexDirection: 'row', gap: 14}}>
-                <Pressable style={[s.pigBtn, rolling && s.mmSubmitOff]} onPress={roll}><Text style={s.pigBtnTxt}>Roll</Text></Pressable>
-                <Pressable style={[s.pigBtn, turnTotal === 0 && s.mmSubmitOff]} onPress={hold}><Text style={s.pigBtnTxt}>Hold</Text></Pressable>
+                <Pressable style={[s.pigBtn, rolling && s.mmSubmitOff]} onPress={roll}><Text style={s.pigBtnTxt}>{tr('Roll')}</Text></Pressable>
+                <Pressable style={[s.pigBtn, turnTotal === 0 && s.mmSubmitOff]} onPress={hold}><Text style={s.pigBtnTxt}>{tr('Hold')}</Text></Pressable>
               </View>
             )}
         </View>
@@ -3840,7 +3843,7 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : `Player ${i + 1}`;
+  const nameFor = (i: number) => (names && (names as any)['p' + (i + 1)]) ? (names as any)['p' + (i + 1)] : tr('Player {n}', {n: i + 1});
   const tokenFor = (p1based: number) => (emojis && (emojis as any)['p' + p1based]) || String(p1based);
   const newGame = () => { if (timer.current) clearTimeout(timer.current); setPos(new Array(players).fill(0)); setTurn(0); setDie(1); setRolling(false); setMsg(''); setHl(null); setPop(null); setEnd(null); };
   const [showSaved, setShowSaved] = useState(false);
@@ -3850,12 +3853,12 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
     if (!Array.isArray(d.pos) || d.pos.length !== players) return;
     setPos(d.pos.slice()); setTurn(d.turn || 0); setDie(d.die || 1); setRolling(false); setMsg(''); setHl(null); setPop(null); setEnd(null); setShowSaved(false);
   };
-  useResume(() => resumeSave('snakes', 'medium', !end && !rolling && pos.some(v => v > 0), `${players} players`, {pos, turn, die, players}));
-  const saveNow = () => onSave({game: 'snakes', key: String(Date.now()).slice(-6), ts: Date.now(), diff: 'medium', label: `${players} players`, data: {pos, turn, die, players}});
+  useResume(() => resumeSave('snakes', 'medium', !end && !rolling && pos.some(v => v > 0), tr('{n} players', {n: players}), {pos, turn, die, players}));
+  const saveNow = () => onSave({game: 'snakes', key: String(Date.now()).slice(-6), ts: Date.now(), diff: 'medium', label: tr('{n} players', {n: players}), data: {pos, turn, die, players}});
 
   const finishTurn = (landed: number) => {
     setHl(null); setRolling(false);
-    if (landed === 100) { onDelete(RESUME_KEY); setEnd({msg: `${tokenFor(turn + 1)} ${nameFor(turn)} wins! 🎉`}); }
+    if (landed === 100) { onDelete(RESUME_KEY); setEnd({msg: tr('{name} wins! 🎉', {name: `${tokenFor(turn + 1)} ${nameFor(turn)}`})}); }
     else setTurn(t => (t + 1) % players);
   };
   const roll = () => {
@@ -3865,12 +3868,12 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
       const d = 1 + Math.floor(Math.random() * 6);
       setDie(d);
       const from = pos[turn], target = from + d;
-      if (target > 100) { setMsg(`Rolled ${d} — need exactly ${100 - from}, stay put`); setRolling(false); setTurn(t => (t + 1) % players); return; }
+      if (target > 100) { setMsg(tr('Rolled {d} — need exactly {n}, stay put', {d, n: 100 - from})); setRolling(false); setTurn(t => (t + 1) % players); return; }
       const np = pos.slice(); np[turn] = target; setPos(np); setHl(target); // step 1: land on the square
       const after = SNL.resolve(target);
-      if (after === target) { setMsg(`Rolled ${d} → ${target}`); timer.current = setTimeout(() => finishTurn(target), 450); return; }
+      if (after === target) { setMsg(tr('Rolled {d} → {t}', {d, t: target})); timer.current = setTimeout(() => finishTurn(target), 450); return; }
       const up = after > target;
-      setMsg(up ? `Rolled ${d} → ${target}, ladder up ${target}→${after}! ↑` : `Rolled ${d} → ${target}, snake down ${target}→${after} ↓`);
+      setMsg(up ? tr('Rolled {d} → {t}, ladder up {t}→{a}! ↑', {d, t: target, a: after}) : tr('Rolled {d} → {t}, snake down {t}→{a} ↓', {d, t: target, a: after}));
       const pool = up ? SNL_LADDER_LINES : SNL_SNAKE_LINES;
       const line = pool[target % pool.length];
       setPop({e: line.e, t: line.t, after}); // pause on the trigger cell; slide runs on Continue
@@ -3889,9 +3892,9 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
     <View style={s.container}>
       <GameHeader title="Snakes & Ladders" onMenu={onMenu} onSave={saveNow} savedCount={saves.length} onShowSaved={() => setShowSaved(true)} onRules={() => setRules(true)} onNew={newGame} />
 
-      <Text style={s.tttLegend}>{Array.from({length: players}).map((_, i) => `${tokenFor(i + 1)} ${nameFor(i)}`).join(' · ')} · race to 100</Text>
+      <Text style={s.tttLegend}>{Array.from({length: players}).map((_, i) => `${tokenFor(i + 1)} ${nameFor(i)}`).join(' · ')} · {tr('race to 100')}</Text>
 
-      <View style={s.msgZone}>{end ? null : <Text style={s.turnBig}>{msg || `${tokenFor(turn + 1)} ${nameFor(turn)}'s turn`}</Text>}</View>
+      <View style={s.msgZone}>{end ? null : <Text style={s.turnBig}>{msg || tr("{name}'s turn", {name: `${tokenFor(turn + 1)} ${nameFor(turn)}`})}</Text>}</View>
 
       <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
         <View style={{position: 'relative'}}>
@@ -3922,8 +3925,8 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
             <View style={[StyleSheet.absoluteFill, {alignItems: 'center', justifyContent: 'center'}]}>
               <View style={s.snPop}>
                 <Text style={s.snPopEmoji}>{pop.e}</Text>
-                <Text style={s.snPopText}>{pop.t}</Text>
-                <Pressable style={[s.playAgainBtn, {paddingVertical: 12, marginTop: 12}]} onPress={continueSlide}><Text style={s.playText}>Continue ▸</Text></Pressable>
+                <Text style={s.snPopText}>{tr(pop.t)}</Text>
+                <Pressable style={[s.playAgainBtn, {paddingVertical: 12, marginTop: 12}]} onPress={continueSlide}><Text style={s.playText}>{tr('Continue ▸')}</Text></Pressable>
               </View>
             </View>
           ) : null}
@@ -3933,8 +3936,8 @@ function Snakes({onMenu, names, emojis, players: propPlayers, saves, onSave, onD
       <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 12}}>
         <DieFace n={die} size={52} />
         {end
-          ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>New game ▸</Text></Pressable>
-          : <Pressable style={[s.pigBtn, rolling && s.mmSubmitOff]} onPress={roll}><Text style={s.pigBtnTxt}>Roll</Text></Pressable>}
+          ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('New game ▸')}</Text></Pressable>
+          : <Pressable style={[s.pigBtn, rolling && s.mmSubmitOff]} onPress={roll}><Text style={s.pigBtnTxt}>{tr('Roll')}</Text></Pressable>}
       </View>
 
       {showSaved ? <SavedModal saves={saves} onLoad={loadSave} onDelete={onDelete} onClose={() => setShowSaved(false)} /> : null}
@@ -3990,19 +3993,19 @@ function Records({stats, onMenu, onToggle, onReset}: {stats: any; onMenu: () => 
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <Pressable style={s.iconBtn} onPress={onMenu}><Text style={s.iconText}>‹ Menu</Text></Pressable>
-        <Text style={s.gameTitle}>🏆 Records</Text>
+        <Pressable style={s.iconBtn} onPress={onMenu}><Text style={s.iconText}>{tr('‹ Menu')}</Text></Pressable>
+        <Text style={s.gameTitle}>{tr('🏆 Records')}</Text>
         <Pressable style={s.iconBtn} onPress={() => PluginManager.closePluginView()}><Text style={s.iconText}>✕</Text></Pressable>
       </View>
-      <Text style={s.tttLegend}>{c.plays || 0} games played in total</Text>
+      <Text style={s.tttLegend}>{tr('{n} games played in total', {n: c.plays || 0})}</Text>
 
       <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom: 20}}>
         <Pressable onPress={onToggle} style={s.toggleRow}>
-          <Text style={s.toggleLbl}>Show my best scores inside games</Text>
-          <View style={[s.toggle, stats.showBest && s.toggleOn]}><Text style={[s.toggleTxt, stats.showBest && s.solidText]}>{stats.showBest ? 'ON' : 'OFF'}</Text></View>
+          <Text style={s.toggleLbl}>{tr('Show my best scores inside games')}</Text>
+          <View style={[s.toggle, stats.showBest && s.toggleOn]}><Text style={[s.toggleTxt, stats.showBest && s.solidText]}>{stats.showBest ? tr('ON') : tr('OFF')}</Text></View>
         </Pressable>
 
-        <Text style={s.sectionLabel}>Personal bests (top 3)</Text>
+        <Text style={s.sectionLabel}>{tr('Personal bests (top 3)')}</Text>
         {BEST_GAMES.map(g => {
           const rows = order.map(d => ({d, arr: STATS.topOf(stats, g, d)})).filter(x => x.arr.length);
           const plays = c['plays_' + g] || 0;
@@ -4010,18 +4013,18 @@ function Records({stats, onMenu, onToggle, onReset}: {stats: any; onMenu: () => 
             <View key={g} style={s.recCard}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                 <GameIcon game={g} size={22} color={INK} />
-                <Text style={s.recGame}>{GAME_META[g].label}</Text>
-                <Text style={s.recMetric}>· {(STATS.BEST as any)[g].label}</Text>
+                <Text style={s.recGame}>{tr(GAME_META[g].label)}</Text>
+                <Text style={s.recMetric}>· {tr((STATS.BEST as any)[g].label)}</Text>
                 <View style={{flex: 1}} />
-                <Text style={s.recMetric}>played {plays}</Text>
+                <Text style={s.recMetric}>{tr('played {n}', {n: plays})}</Text>
               </View>
-              {rows.length === 0 ? <Text style={s.recEmpty}>no records yet — go play!</Text>
-                : rows.map(x => <Text key={x.d} style={s.recLine}>{DIFFICULTIES[x.d].label}: <Text style={s.bold}>{x.arr.join(' · ')}</Text></Text>)}
+              {rows.length === 0 ? <Text style={s.recEmpty}>{tr('no records yet — go play!')}</Text>
+                : rows.map(x => <Text key={x.d} style={s.recLine}>{tr(DIFFICULTIES[x.d].label)}: <Text style={s.bold}>{x.arr.join(' · ')}</Text></Text>)}
             </View>
           );
         })}
 
-        <Text style={s.sectionLabel}>Nonogram gallery — {stats.gallery.length}/{NONO_TOTAL} pictures</Text>
+        <Text style={s.sectionLabel}>{tr('Nonogram gallery — {n}/{t} pictures', {n: stats.gallery.length, t: NONO_TOTAL})}</Text>
         {(['5', '8', '10'] as string[]).map(sz => (
           <View key={sz} style={{marginBottom: 10}}>
             <Text style={s.recMetric}>{sz}×{sz}</Text>
@@ -4033,7 +4036,7 @@ function Records({stats, onMenu, onToggle, onReset}: {stats: any; onMenu: () => 
                     <View style={[s.galArt, got && s.galArtOn]}>
                       {got ? <MiniPic rows={pic.rows} /> : <Text style={s.galQ}>?</Text>}
                     </View>
-                    <Text style={s.galName} numberOfLines={1}>{got ? pic.name : '—'}</Text>
+                    <Text style={s.galName} numberOfLines={1}>{got ? tr(pic.name) : '—'}</Text>
                   </View>
                 );
               })}
@@ -4041,27 +4044,27 @@ function Records({stats, onMenu, onToggle, onReset}: {stats: any; onMenu: () => 
           </View>
         ))}
 
-        <Text style={s.sectionLabel}>Tally</Text>
+        <Text style={s.sectionLabel}>{tr('Tally')}</Text>
         <View style={s.recCard}>
-          <Text style={s.recLine}>Minefields cleared — Easy <Text style={s.bold}>{c.mines_easy || 0}</Text> · Medium <Text style={s.bold}>{c.mines_medium || 0}</Text> · Hard <Text style={s.bold}>{c.mines_hard || 0}</Text></Text>
-          <Text style={s.recLine}>Word Search grids finished — <Text style={s.bold}>{c.words || 0}</Text></Text>
+          <Text style={s.recLine}>{tr('Minefields cleared')} — {tr('Easy')} <Text style={s.bold}>{c.mines_easy || 0}</Text> · {tr('Medium')} <Text style={s.bold}>{c.mines_medium || 0}</Text> · {tr('Hard')} <Text style={s.bold}>{c.mines_hard || 0}</Text></Text>
+          <Text style={s.recLine}>{tr('Word Search grids finished')} — <Text style={s.bold}>{c.words || 0}</Text></Text>
         </View>
 
-        <Text style={s.sectionLabel}>Badges</Text>
+        <Text style={s.sectionLabel}>{tr('Badges')}</Text>
         {badges.map(b => (
           <View key={b.id} style={s.badgeRow}>
             <Text style={[s.badgeMark, b.earned && s.badgeMarkOn]}>{b.earned ? '★' : '☆'}</Text>
             <View style={{flex: 1}}>
-              <Text style={[s.badgeLbl, !b.earned && {color: MUTE}]}>{b.label}</Text>
-              <Text style={s.badgeHint}>{b.hint}</Text>
+              <Text style={[s.badgeLbl, !b.earned && {color: MUTE}]}>{tr(b.label)}</Text>
+              <Text style={s.badgeHint}>{tr(b.hint)}</Text>
             </View>
           </View>
         ))}
 
         <Pressable style={[s.resetBtn, confirmReset && s.resetBtnArmed]} onPress={() => { if (confirmReset) { onReset(); setConfirmReset(false); } else setConfirmReset(true); }}>
-          <Text style={[s.resetTxt, confirmReset && s.solidText]}>{confirmReset ? 'Tap again to erase ALL records' : 'Reset all records'}</Text>
+          <Text style={[s.resetTxt, confirmReset && s.solidText]}>{confirmReset ? tr('Tap again to erase ALL records') : tr('Reset all records')}</Text>
         </Pressable>
-        {confirmReset ? <Pressable style={{alignSelf: 'center', padding: 8}} onPress={() => setConfirmReset(false)}><Text style={s.recMetric}>cancel</Text></Pressable> : null}
+        {confirmReset ? <Pressable style={{alignSelf: 'center', padding: 8}} onPress={() => setConfirmReset(false)}><Text style={s.recMetric}>{tr('cancel')}</Text></Pressable> : null}
       </ScrollView>
     </View>
   );
@@ -4071,6 +4074,9 @@ function Records({stats, onMenu, onToggle, onReset}: {stats: any; onMenu: () => 
 
 // One Battleship cell, memoized so a tap only re-renders the cell that changed
 // (a 10×10 — or two, in 2-player — is otherwise 100–200 Pressables per tap).
+// Ship names collide with game titles ("Battleship"), so they get their own 'ship:' keys.
+const shipName = (n: string) => { const v = tr('ship:' + n); return v.indexOf('ship:') === 0 ? n : v; };
+
 const BsCell = React.memo(function BsCell({cell, v, ship, i, onTap}: {cell: number; v: number; ship: boolean; i: number; onTap: (i: number) => void}) {
   const bg = v === 3 ? INK : (ship ? '#D2D2D2' : PAPER); // 3 = cell of a SUNK ship
   return (
@@ -4126,8 +4132,8 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
     setSunkMask(Array.isArray(d.sunkMask) ? d.sunkMask.slice() : new Array(SHIP.FLEET.length).fill(false));
     setEnd(null); setShowSaved(false); setPhase('battle'); // a loaded game is already past placement
   };
-  useResume(() => resumeSave('battle', diff, !end && !busy && (verbal ? (incoming.some(v => v) || shots.some(v => v)) : (turn === 'you' && youFired.some(v => v))), verbal ? '2-player (paper)' : `vs SuperFun (${DIFFICULTIES[diff].label})`, {verbal, enemy: serBoard(enemy), my: serBoard(my), youFired, aiFired, aiHitsOpen: aiHitsOpen.current, turn, incoming, shots, sunkMask}));
-  const saveNow = () => { if (placing) return; onSave({game: 'battle', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: verbal ? '2-player (paper)' : `vs SuperFun (${DIFFICULTIES[diff].label})`, data: {verbal, enemy: serBoard(enemy), my: serBoard(my), youFired, aiFired, aiHitsOpen: aiHitsOpen.current, turn, incoming, shots, sunkMask}}); };
+  useResume(() => resumeSave('battle', diff, !end && !busy && (verbal ? (incoming.some(v => v) || shots.some(v => v)) : (turn === 'you' && youFired.some(v => v))), verbal ? tr('2-player (paper)') : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), {verbal, enemy: serBoard(enemy), my: serBoard(my), youFired, aiFired, aiHitsOpen: aiHitsOpen.current, turn, incoming, shots, sunkMask}));
+  const saveNow = () => { if (placing) return; onSave({game: 'battle', key: String(Date.now()).slice(-6), ts: Date.now(), diff, label: verbal ? tr('2-player (paper)') : tr('vs SuperFun ({diff})', {diff: tr(DIFFICULTIES[diff].label)}), data: {verbal, enemy: serBoard(enemy), my: serBoard(my), youFired, aiFired, aiHitsOpen: aiHitsOpen.current, turn, incoming, shots, sunkMask}}); };
 
   const newGame = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -4145,12 +4151,12 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
     if (placeIdx >= SHIP.FLEET.length) return;
     const f = SHIP.FLEET[placeIdx];
     const cells = SHIP.tryPlaceAt(my, f.size, (idx / size) | 0, idx % size, horiz);
-    if (!cells) { setFlash("Doesn't fit — ships can't touch. Rotate or pick another cell."); return; }
+    if (!cells) { setFlash(tr("Doesn't fit — ships can't touch. Rotate or pick another cell.")); return; }
     const nb = {size: my.size, ship: Int8Array.from(my.ship), ships: my.ships.slice()};
     SHIP.addShip(nb, cells, f.size, f.name);
     setMy(nb); setPlaceIdx(placeIdx + 1); setFlash('');
   };
-  const autoPlace = () => { setMy(SHIP.placeFleet(size, SHIP.FLEET, Math.random)); setPlaceIdx(SHIP.FLEET.length); setFlash('Fleet placed at random — tweak with Reset, or start.'); };
+  const autoPlace = () => { setMy(SHIP.placeFleet(size, SHIP.FLEET, Math.random)); setPlaceIdx(SHIP.FLEET.length); setFlash(tr('Fleet placed at random — tweak with Reset, or start.')); };
   const resetPlace = () => { setMy(SHIP.emptyBoard(size)); setPlaceIdx(0); setFlash(''); };
   const startBattle = () => { setPhase('battle'); setFlash(''); };
 
@@ -4163,12 +4169,12 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
       const af = afState.slice(); af[pick] = res.hit ? 2 : 1;
       if (res.hit) {
         aiHitsOpen.current.push(pick);
-        if (res.sunk) { const sc = my.ships[res.shipIndex].cells; for (let k = 0; k < sc.length; k++) af[sc[k]] = 3; aiHitsOpen.current = aiHitsOpen.current.filter(x => sc.indexOf(x) < 0); setFlash(`SuperFun sank your ${my.ships[res.shipIndex].name}!`); }
-        else setFlash('SuperFun hit your fleet.');
-      } else setFlash('SuperFun missed.');
+        if (res.sunk) { const sc = my.ships[res.shipIndex].cells; for (let k = 0; k < sc.length; k++) af[sc[k]] = 3; aiHitsOpen.current = aiHitsOpen.current.filter(x => sc.indexOf(x) < 0); setFlash(tr('SuperFun sank your {ship}!', {ship: shipName(my.ships[res.shipIndex].name)})); }
+        else setFlash(tr('SuperFun hit your fleet.'));
+      } else setFlash(tr('SuperFun missed.'));
       setAiFired(af);
       setBusy(false);
-      if (SHIP.allSunk(my)) { onDelete(RESUME_KEY); setEnd({msg: 'Your whole fleet is sunk 🤖'}); return; }
+      if (SHIP.allSunk(my)) { onDelete(RESUME_KEY); setEnd({msg: tr('Your whole fleet is sunk 🤖')}); return; }
       setTurn('you');
     }, 400);
   };
@@ -4177,10 +4183,10 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
     if (busy || end || turn !== 'you' || youFired[idx]) return;
     const res = SHIP.fire(enemy, idx);
     const yf = youFired.slice(); yf[idx] = res.hit ? 2 : 1;
-    if (res.sunk) { const sc = enemy.ships[res.shipIndex].cells; for (let k = 0; k < sc.length; k++) yf[sc[k]] = 3; setFlash(`You sank their ${enemy.ships[res.shipIndex].name} (${sc.length} squares)! 🎯`); }
-    else setFlash(res.hit ? 'A hit! 🔥' : 'Miss.');
+    if (res.sunk) { const sc = enemy.ships[res.shipIndex].cells; for (let k = 0; k < sc.length; k++) yf[sc[k]] = 3; setFlash(tr('You sank their {ship} ({n} squares)! 🎯', {ship: shipName(enemy.ships[res.shipIndex].name), n: sc.length})); }
+    else setFlash(res.hit ? tr('A hit! 🔥') : tr('Miss.'));
     setYouFired(yf);
-    if (SHIP.allSunk(enemy)) { onDelete(RESUME_KEY); setEnd({msg: 'You sank the whole fleet! 🎉'}); return; }
+    if (SHIP.allSunk(enemy)) { onDelete(RESUME_KEY); setEnd({msg: tr('You sank the whole fleet! 🎉')}); return; }
     setTurn('ai'); aiTurn(aiFired);
   };
 
@@ -4190,13 +4196,13 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
     ni[idx] = (ni[idx] + 1) % 3; // 0 empty → 1 your ship (grey) → 2 hit ✗ → 0
     setIncoming(ni);
     let hits = 0; for (let i = 0; i < N; i++) if (ni[i] === 2) hits++;
-    if (hits >= totalCells) { onDelete(RESUME_KEY); setEnd({msg: 'Your whole fleet is sunk — you lose.'}); }
+    if (hits >= totalCells) { onDelete(RESUME_KEY); setEnd({msg: tr('Your whole fleet is sunk — you lose.')}); }
   };
   const cycleShot = (idx: number) => {
     if (end) return;
     const ns = shots.slice(); ns[idx] = (ns[idx] + 1) % 3; setShots(ns);
     let hits = 0; for (let i = 0; i < N; i++) if (ns[i] === 1) hits++;
-    if (hits >= totalCells) { onDelete(RESUME_KEY); setEnd({msg: 'You sank their fleet — you win! 🎉'}); }
+    if (hits >= totalCells) { onDelete(RESUME_KEY); setEnd({msg: tr('You sank their fleet — you win! 🎉')}); }
   };
 
   // Stable tap callbacks (via refs) so BsCell's memo isn't defeated by a new closure each render.
@@ -4240,11 +4246,11 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
         const sunk = sunkAt ? !!sunkAt[i] : sh.hits >= sh.size;
         const row = (
           <>
-            <Text style={[s.bsShipName, sunk && s.bsSunkName]}>{sh.name}</Text>
+            <Text style={[s.bsShipName, sunk && s.bsSunkName]}>{shipName(sh.name)}</Text>
             <View style={{flexDirection: 'row', gap: 2}}>
               {Array.from({length: sh.size}).map((_, k) => <View key={k} style={[s.bsPip, sunk && s.bsPipSunk]} />)}
             </View>
-            {sunk ? <Text style={s.bsSunkBadge}>SUNK</Text> : (onToggle ? <Text style={s.bsTapHint}>tap ✓</Text> : null)}
+            {sunk ? <Text style={s.bsSunkBadge}>{tr('SUNK')}</Text> : (onToggle ? <Text style={s.bsTapHint}>{tr('tap ✓')}</Text> : null)}
           </>
         );
         return onToggle
@@ -4255,9 +4261,9 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
   );
 
   const status = end ? ''
-    : placing ? (flash || (placeIdx < SHIP.FLEET.length ? `Place your ${SHIP.FLEET[placeIdx].name} (${SHIP.FLEET[placeIdx].size} squares)` : 'Fleet ready — Start battle ▸'))
-    : verbal ? (flash || 'Call your shots aloud · mark each reply')
-    : (flash || (busy ? 'SuperFun is firing…' : 'Your shot — tap a square on Enemy waters'));
+    : placing ? (flash || (placeIdx < SHIP.FLEET.length ? tr('Place your {ship} ({n} squares)', {ship: shipName(SHIP.FLEET[placeIdx].name), n: SHIP.FLEET[placeIdx].size}) : tr('Fleet ready — Start battle ▸')))
+    : verbal ? (flash || tr('Call your shots aloud · mark each reply'))
+    : (flash || (busy ? tr('SuperFun is firing…') : tr('Your shot — tap a square on Enemy waters')));
 
   return (
     <View style={s.container}>
@@ -4270,39 +4276,39 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
           {placing ? (
             <>
               <View style={s.bsPlaceRow}>
-                <Pressable onPress={() => setHoriz(h => !h)} style={s.segBtn}><Text style={s.segTxt}>{horiz ? 'Horizontal ↔' : 'Vertical ↕'}</Text></Pressable>
-                <Pressable onPress={autoPlace} style={s.segBtn}><Text style={s.segTxt}>Auto-place</Text></Pressable>
-                <Pressable onPress={resetPlace} style={s.segBtn}><Text style={s.segTxt}>Reset</Text></Pressable>
+                <Pressable onPress={() => setHoriz(h => !h)} style={s.segBtn}><Text style={s.segTxt}>{horiz ? tr('Horizontal ↔') : tr('Vertical ↕')}</Text></Pressable>
+                <Pressable onPress={autoPlace} style={s.segBtn}><Text style={s.segTxt}>{tr('Auto-place')}</Text></Pressable>
+                <Pressable onPress={resetPlace} style={s.segBtn}><Text style={s.segTxt}>{tr('Reset')}</Text></Pressable>
               </View>
-              <Text style={s.bsLabel}>Your waters — tap a square to drop each ship</Text>
+              <Text style={s.bsLabel}>{tr('Your waters — tap a square to drop each ship')}</Text>
               {CoordGrid({cell: EC, state: Array.from({length: N}, () => 0), onTap: onPlace, showShips: true})}
-              <Text style={s.bsHint}>Fleet to place:</Text>
+              <Text style={s.bsHint}>{tr('Fleet to place:')}</Text>
               <View style={s.bsRoster}>
                 {SHIP.FLEET.map((f: any, i: number) => (
                   <View key={i} style={s.bsShipRow}>
-                    <Text style={[s.bsShipName, i < placeIdx && s.bsSunkName]}>{f.name}</Text>
+                    <Text style={[s.bsShipName, i < placeIdx && s.bsSunkName]}>{shipName(f.name)}</Text>
                     <View style={{flexDirection: 'row', gap: 2}}>{Array.from({length: f.size}).map((_, k) => <View key={k} style={s.bsPip} />)}</View>
-                    {i < placeIdx ? <Text style={s.bsSunkBadge}>✓ placed</Text> : i === placeIdx ? <Text style={[s.bsSunkBadge, {color: INK}]}>◄ next</Text> : null}
+                    {i < placeIdx ? <Text style={s.bsSunkBadge}>{tr('✓ placed')}</Text> : i === placeIdx ? <Text style={[s.bsSunkBadge, {color: INK}]}>{tr('◄ next')}</Text> : null}
                   </View>
                 ))}
               </View>
             </>
           ) : verbal ? (
             <>
-              <Text style={s.bsLabel}>Your shots — tap: ✗ hit → ○ miss (water) → clear</Text>
+              <Text style={s.bsLabel}>{tr('Your shots — tap: ✗ hit → ○ miss (water) → clear')}</Text>
               {CoordGrid({cell: EC, state: shots.map(v => (v === 1 ? 2 : v === 2 ? 1 : 0)), onTap: onCycle, showShips: false})}
-              <Text style={s.bsHint}>Enemy fleet — tap a ship to cross it off:</Text>
+              <Text style={s.bsHint}>{tr('Enemy fleet — tap a ship to cross it off:')}</Text>
               {Roster({ships: SHIP.FLEET, sunkAt: sunkMask, onToggle: toggleSunk})}
-              <Text style={[s.bsLabel, {marginTop: 12}]}>Your fleet — tap to place a ship (grey), tap again to mark it hit ✗</Text>
+              <Text style={[s.bsLabel, {marginTop: 12}]}>{tr('Your fleet — tap to place a ship (grey), tap again to mark it hit ✗')}</Text>
               {CoordGrid({cell: FC, state: incoming.map(x => (x === 2 ? 2 : 0)), onTap: onMark, showShips: false, ships: incoming.map(x => x >= 1)})}
             </>
           ) : (
             <>
-              <Text style={s.bsLabel}>Enemy waters — fire here</Text>
+              <Text style={s.bsLabel}>{tr('Enemy waters — fire here')}</Text>
               {CoordGrid({cell: EC, state: youFired, onTap: onFire, showShips: false})}
-              <Text style={s.bsHint}>Enemy fleet:</Text>
+              <Text style={s.bsHint}>{tr('Enemy fleet:')}</Text>
               {Roster({ships: enemy.ships})}
-              <Text style={[s.bsLabel, {marginTop: 12}]}>Your fleet</Text>
+              <Text style={[s.bsLabel, {marginTop: 12}]}>{tr('Your fleet')}</Text>
               {CoordGrid({cell: FC, state: aiFired, onTap: onNoop, showShips: true})}
             </>
           )}
@@ -4311,8 +4317,8 @@ function Battleship({diff, mode, names, emojis, onMenu, saves, onSave, onDelete}
       </View>
 
       <View style={s.belowZone}>
-        {end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>Play again ▸</Text></Pressable>
-          : placing && placeIdx >= SHIP.FLEET.length ? <Pressable style={s.playAgainBtn} onPress={startBattle}><Text style={s.playText}>Start battle ▸</Text></Pressable>
+        {end ? <Pressable style={s.playAgainBtn} onPress={newGame}><Text style={s.playText}>{tr('Play again ▸')}</Text></Pressable>
+          : placing && placeIdx >= SHIP.FLEET.length ? <Pressable style={s.playAgainBtn} onPress={startBattle}><Text style={s.playText}>{tr('Start battle ▸')}</Text></Pressable>
           : null}
       </View>
 
